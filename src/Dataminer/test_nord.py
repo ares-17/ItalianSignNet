@@ -1,10 +1,11 @@
 from Dataminer import Dataminer, Type, NumberSelector
 import utility
 import os
+from config.costants import *
 
 n_threads = 4
 
-cartellaBase = r"/Users/matteospavone/Desktop/Testing" #Inserire percorso locale per testing
+cartellaBase = BASE_DIR / 'Testing' #Inserire percorso locale per testing
 nome_esecuzione = "NordOvest_data" #Inserire nome cartella esecuzione da generare
 
 # Impostazione coordinate - da modificare in base all'area
@@ -27,7 +28,7 @@ outputRitagli = os.path.join(cartellaBase, nome_esecuzione, "resized_images")
 percorso_esecuzione = os.path.join(cartellaBase, nome_esecuzione)
 geojson_file_path = os.path.join(geojsonFolder, "mapF_id_list.txt")
 
-percorso_configurazione = r"/Users/matteospavone/Desktop/Testing/custom_config.txt"
+percorso_configurazione = BASE_DIR / 'Testing' / 'custom_config.txt'
 with open(percorso_configurazione, 'r') as f:
     custom_signals = [line.strip() for line in f]
 

@@ -15,6 +15,7 @@ import itertools
 from typing import Protocol
 import os
 import utility
+
 class Type(Enum):
     ALL = "all"
     LANE_MARKINGS = "marking"

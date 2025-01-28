@@ -9,6 +9,8 @@ from tensorflow.keras.layers import Flatten, Conv2D, MaxPooling2D, Dense, Dropou
 from tensorflow.keras import Sequential
 import json
 import pandas as pd
+from config.costants import *
+
 # Parametri del modello e training
 MODEL_PATH = 'Saved_Models/VGGnet.keras'  # Percorso per salvare/caricare il modello
 EPOCHS = 15
@@ -233,15 +235,15 @@ def merge_csv_on_filename(csv1_path, csv2_path, output_path="merged.csv"):
 
 
 
-image_folder = '/Users/matteospavone/Desktop/Testing/Test2/resized_images'
-json_folder = '/Users/matteospavone/Desktop/Testing/Test2/annotations_image' # Percorso della cartella JSON
+image_folder = BASE_DIR / 'Testing/Test2/resized_images'
+json_folder = BASE_DIR / 'Testing/Test2/annotations_image' # Percorso della cartella JSON
 predict_and_save_to_csv(VGGNet_Model, image_folder, json_folder)
 
 #Sostituisci con il percorso del tuo file che contiene le predizioni
-csv1_path = "/Users/matteospavone/Desktop/Pycharm/predictionToolV2/predictions.csv"  
+csv1_path = BASE_DIR / 'src/predictionToolV2/predictions.csv'  
 
 #Sostituisci con il percorso del file annotations.csv generato del tuo dataset
-csv2_path = "/Users/matteospavone/Desktop/Testing/Test2/annotations.csv"  
+csv2_path = BASE_DIR / 'Testing/Test2/annotations.csv'  
 
 
 output_path = "merged_file.csv" # Sostituisci con il percorso desiderato per il file di output

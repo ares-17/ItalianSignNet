@@ -1,9 +1,11 @@
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from config.costants import *
 
 # Carica il file CSV creato dopo il merge
-csv_file = '/Users/matteospavone/Desktop/Pycharm/predictionToolV2/merged_file.csv'
+csv_file = os.path.join(BASE_DIR, 'src', 'predictionToolV2', 'merged_file.csv')
 data = pd.read_csv(csv_file, sep=',')
 print("Colonne del file:", data.columns.tolist())
 

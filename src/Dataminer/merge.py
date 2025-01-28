@@ -2,6 +2,7 @@ import os
 import shutil
 import pandas as pd
 import utility
+from config.costants import *
 
 def merge_test_data_folders(input_folders, input_directory, output_folder):
     """
@@ -58,7 +59,7 @@ def list_available_folders(directory="."):
     return folders
 
 
-input_directory = r"/Users/matteospavone/Desktop/Testing"
+input_directory = BASE_DIR / "Testing"
 
 try:
     available_folders = list_available_folders(input_directory)
