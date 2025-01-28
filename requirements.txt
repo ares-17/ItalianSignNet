@@ -1,0 +1,22 @@
+# Core data processing
+numpy==1.26.4
+pandas==2.2.1
+
+# Visualization
+matplotlib==3.8.2
+seaborn==0.13.2
+folium==0.15.1
+
+# Geospatial
+geojson==3.1.0
+mapbox-vector-tile==1.2.1
+geopy==2.4.1
+vt2geojson==0.2.1
+
+# Computer Vision & ML
+opencv-python-headless==4.9.0.80
+tensorflow==2.15.0
+
+# Utilities & Networking
+requests==2.31.0
+protobuf==3.20.3  # Necessario per prevenire conflitti con TensorFlow

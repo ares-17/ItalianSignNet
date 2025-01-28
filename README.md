@@ -17,5 +17,24 @@ ALTRI FILE
 - custom_config.txt : file che contiene la configurazione custom dei segnali stradali. Utilizzando questo file di configurazione (o modificandolo) scarica solo i segnali le cui label sono contenute in questo file. Nella mia configurazione ci sono tutti i segnali appartenenti alle 43 classi del GTRSB
 
 ## Istruzioni aggiuntive nuova disposizione
-Per utilizzare gli script Python occorre creare un file .env in "env", inserendo i valori indicati dagli esempi del file .env.dummy.
+Per utilizzare gli script Python occorre creare un file `.env` a livello di progetto, inserendo i valori indicati dagli esempi del file `.env.dummy`.
 
+### Configurazione librerie
+Si consiglia di gestire le librerie in ambienti virtuali, come offerto da python venv.
+```bash
+# Creazione ambiente (da eseguire nella root del progetto)
+python -m venv .venv
+
+# Attivazione (Windows)
+.venv\Scripts\activate
+
+# Attivazione (Linux/macOS)
+source .venv/bin/activate
+
+# Installazione dipendenze
+pip install -r requirements.txt
+
+# Disattivazione
+deactivate
+```
+Si consiglia caldamente di non committare la cartella associata all'ambiente virtuale.
