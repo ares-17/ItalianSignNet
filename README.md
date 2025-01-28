@@ -1,3 +1,4 @@
+# Istruzioni da aggiornare vecchio README
 Dataminer: Tool per il mining di dataset
 - test_nord.py: esempio di main, modificare le impostazioni come indicato. E' possibile replicare lo stesso main su più file .py per esecuzione parallela.
 - merge.py: Tool di merge, modificare la cartella di input inserendo la stessa cartella delle esecuzioni all'interno del main
@@ -14,4 +15,7 @@ Test2: Dataset di segnali stradali italiani
 
 ALTRI FILE
 - custom_config.txt : file che contiene la configurazione custom dei segnali stradali. Utilizzando questo file di configurazione (o modificandolo) scarica solo i segnali le cui label sono contenute in questo file. Nella mia configurazione ci sono tutti i segnali appartenenti alle 43 classi del GTRSB
+
+## Istruzioni aggiuntive nuova disposizione
+Per utilizzare gli script Python occorre creare un file .env in "env", inserendo i valori indicati dagli esempi del file .env.dummy.
 
