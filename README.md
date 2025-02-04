@@ -38,3 +38,40 @@ pip install -r requirements.txt
 deactivate
 ```
 Si consiglia caldamente di non committare la cartella associata all'ambiente virtuale.
+
+## analizer2.py
+### Funzionalità Principali
+
+#### 1. **Analisi Geografica**
+- Distribuzione previsioni corrette/errate (Pie Chart)
+- Probabilità media per area (Bar Chart)
+- Classi con maggiori errori (Stacked Bar Chart)
+
+#### 2. **Analisi per Classe**
+- Probabilità media per classe
+- Classi più problematiche
+- Classi meglio riconosciute
+
+#### 3. **Analisi Feature**
+- Performance per caratteristiche tecniche
+- Classifica feature più affidabili
+
+#### 4. **Analisi Statistica Avanzata**
+- Distribuzione probabilità (Istogrammi)
+- Identificazione outlier (Box Plot)
+- Correlazione risultati-probabilità
+
+### File di Output
+| File | Descrizione |
+|------|-------------|
+| `pie_chart_*.png` | Distribuzione geografica risultati |
+| `probabilita_media.png` | Probabilità media per area |
+| `classi_*` | Analisi errori/corretti per classe |
+| `performance_*` | Report prestazioni per feature |
+| `*_probabilità.png` | Analisi distribuzioni probabilistiche |
+
+### Utilizzo
+1. Configurare `.env` con percorso dataset (`BASE_DIR`)
+2. Posizionare il CSV dei risultati in:  
+   `BASE_DIR/src/predictionToolV2/merged_file.csv`
+3. Eseguire lo script per generare report e grafici

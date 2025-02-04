@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 load_dotenv()
 BASE_DIR = os.getenv("BASE_DIR")
 
+# Crea la cartella per i risultati
+output_dir = os.path.join(BASE_DIR, 'src', 'analizerTool', '.results')
+os.makedirs(output_dir, exist_ok=True)  # Crea la cartella se non esiste
+
 # Carica il file CSV creato dopo il merge
 csv_file = os.path.join(BASE_DIR, 'src', 'predictionToolV2', 'merged_file.csv')
 data = pd.read_csv(csv_file, sep=',')
@@ -22,12 +26,10 @@ results_by_geo["% Correct (T)"] = (results_by_geo["T"] / results_by_geo["Total"]
 
 # Creazione di pie chart per ogni locazione geografica
 for location in results_by_geo.index:
-    # Dati per la locazione
     data_location = results_by_geo.loc[location, ["T", "F"]]
     labels = ["Correct (T)", "Incorrect (F)"]
-    colors = ["#4CAF50", "#F44336"]  # Verde per corrette, rosso per sbagliate
+    colors = ["#4CAF50", "#F44336"]
 
-    # Creazione del pie chart
     plt.figure(figsize=(6, 6))
     plt.pie(
         data_location,
@@ -35,56 +37,53 @@ for location in results_by_geo.index:
         autopct="%1.1f%%",
         startangle=90,
         colors=colors,
-        explode=(0.05, 0),  # Leggero distacco per il primo segmento
+        explode=(0.05, 0),
         wedgeprops={"edgecolor": "black"}
     )
     plt.title(f"Distribuzione previsioni - {location}")
     plt.tight_layout()
-    plt.savefig(f"pie_chart_{location.replace(' ', '_').lower()}.png")
+    filename = f"pie_chart_{location.replace(' ', '_').lower()}.png"
+    plt.savefig(os.path.join(output_dir, filename))
     plt.show()
 
 # Analisi 2: Probabilità media di previsione per area geografica e risultato
 probability_mean_geo = data.groupby(["Geographic Location", "Results"])["Probability"].mean().unstack()
 
-# Grafico per analisi 2
 probability_mean_geo.plot(kind="bar", figsize=(10, 6), alpha=0.7)
 plt.title("Probabilità media per area geografica e risultato")
 plt.ylabel("Probabilità media")
 plt.xlabel("Area geografica")
 plt.legend(title="Risultati")
 plt.tight_layout()
-plt.savefig("probabilita_media.png")
+plt.savefig(os.path.join(output_dir, "probabilita_media.png"))
 plt.show()
 
 # Analisi 3: Classi con più errori (F) per area geografica
 errors_by_class = data[data["Results"] == "F"].groupby(["Geographic Location", "Predicted Class"]).size().unstack(fill_value=0)
 
-# Grafico per analisi 3
 errors_by_class.plot(kind="bar", stacked=True, figsize=(12, 6), colormap="tab20")
 plt.title("Distribuzione delle classi con errori per area geografica")
 plt.ylabel("Numero di errori")
 plt.xlabel("Area geografica")
 plt.tight_layout()
-plt.savefig("classi_con_errori.png")
+plt.savefig(os.path.join(output_dir, "classi_con_errori.png"))
 plt.show()
 
 # Analisi 4: Classi più comuni riconosciute correttamente (T)
 correct_by_class = data[data["Results"] == "T"].groupby(["Geographic Location", "Predicted Class"]).size().unstack(fill_value=0)
 
-# Grafico per analisi 4
 correct_by_class.plot(kind="bar", stacked=True, figsize=(12, 6), colormap="tab10")
 plt.title("Distribuzione delle classi corrette per area geografica")
 plt.ylabel("Numero di riconoscimenti")
 plt.xlabel("Area geografica")
 plt.tight_layout()
-plt.savefig("classi_correttamente_riconosciute.png")
+plt.savefig(os.path.join(output_dir, "classi_correttamente_riconosciute.png"))
 plt.show()
 
 # Analisi 5: Performance basata sulle caratteristiche dei segnali
 feature_performance = data.groupby(["Geographic Location", "feature", "Results"]).size().unstack(fill_value=0)
 feature_performance["% Correct (T)"] = (feature_performance["T"] / (feature_performance["T"] + feature_performance["F"])) * 100
 
-# Grafico per analisi 5
 for geo in feature_performance.index.get_level_values(0).unique():
     geo_data = feature_performance.loc[geo]
     geo_data[["% Correct (T)"]].sort_values(by="% Correct (T)", ascending=False).plot(kind="bar", figsize=(10, 6))
@@ -92,7 +91,8 @@ for geo in feature_performance.index.get_level_values(0).unique():
     plt.ylabel("Percentuale di correttezza")
     plt.xlabel("Caratteristiche dei segnali")
     plt.tight_layout()
-    plt.savefig(f"performance_caratteristiche_{geo}.png")
+    filename = f"performance_caratteristiche_{geo}.png"
+    plt.savefig(os.path.join(output_dir, filename))
     plt.show()
 
 # Calcolo della performance complessiva (totale)
@@ -100,44 +100,39 @@ total_performance = feature_performance.groupby("feature").apply(
     lambda x: (x["T"].sum() / (x["T"].sum() + x["F"].sum())) * 100
 ).sort_values(ascending=False)
 
-# Grafico della performance complessiva
 total_performance.plot(kind="bar", figsize=(10, 6), color="#4CAF50")
 plt.title("Performance complessiva basata sulle caratteristiche dei segnali")
 plt.ylabel("Percentuale di correttezza")
 plt.xlabel("Caratteristiche dei segnali")
 plt.tight_layout()
-plt.savefig("performance_caratteristiche_totale.png")
+plt.savefig(os.path.join(output_dir, "performance_caratteristiche_totale.png"))
 plt.show()
-
 
 # Calcolo della probabilità media per classe
 prob_mean_by_class = data.groupby("Predicted Class")["Probability"].mean().sort_values(ascending=False)
 
-# Visualizzazione
 plt.figure(figsize=(10, 6))
 prob_mean_by_class.plot(kind="bar", color="#4CAF50")
 plt.title("Probabilità media per classe")
 plt.ylabel("Probabilità media")
 plt.xlabel("Classe prevista")
 plt.tight_layout()
-plt.savefig("probabilità_media_classe.png")
+plt.savefig(os.path.join(output_dir, "probabilità_media_classe.png"))
 plt.show()
 
 print("Classe con probabilità media più alta:")
 print(prob_mean_by_class.head(1))
 
-
 # Conteggio degli errori per classe
 errors_by_class = data[data["Results"] == "F"].groupby("Predicted Class").size().sort_values(ascending=False)
 
-# Visualizzazione
 plt.figure(figsize=(10, 6))
 errors_by_class.plot(kind="bar", color="#F44336")
 plt.title("Numero di errori per classe")
 plt.ylabel("Numero di errori")
 plt.xlabel("Classe prevista")
 plt.tight_layout()
-plt.savefig("errori_per_classe.png")
+plt.savefig(os.path.join(output_dir, "errori_per_classe.png"))
 plt.show()
 
 print("Classe con il maggior numero di errori:")
@@ -150,7 +145,7 @@ plt.title("Analisi degli outlier - Probabilità per risultato")
 plt.ylabel("Probabilità")
 plt.xlabel("Risultato")
 plt.tight_layout()
-plt.savefig("outlier_probabilità.png")
+plt.savefig(os.path.join(output_dir, "outlier_probabilità.png"))
 plt.show()
 
 # Distribuzione delle probabilità per T e F
@@ -160,5 +155,5 @@ plt.title("Distribuzione della probabilità per risultato")
 plt.xlabel("Probabilità")
 plt.ylabel("Densità")
 plt.tight_layout()
-plt.savefig("distribuzione_probabilità.png")
+plt.savefig(os.path.join(output_dir, "distribuzione_probabilità.png"))
 plt.show()

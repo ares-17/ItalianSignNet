@@ -150,3 +150,4 @@ cython_debug/
 testing/
 
 src/predictionToolV2/traffic-signs-data/
+src/analizerTool/.*
