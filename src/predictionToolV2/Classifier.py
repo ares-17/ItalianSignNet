@@ -9,7 +9,10 @@ from tensorflow.keras.layers import Flatten, Conv2D, MaxPooling2D, Dense, Dropou
 from tensorflow.keras import Sequential
 import json
 import pandas as pd
-from config.costants import *
+from dotenv import load_dotenv
+
+load_dotenv()
+BASE_DIR = os.getenv("BASE_DIR")
 
 # Parametri del modello e training
 MODEL_PATH = 'Saved_Models/VGGnet.keras'  # Percorso per salvare/caricare il modello

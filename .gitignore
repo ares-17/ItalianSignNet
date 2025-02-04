@@ -145,3 +145,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# For dataminer's file
+testing/
+
+src/predictionToolV2/traffic-signs-data/

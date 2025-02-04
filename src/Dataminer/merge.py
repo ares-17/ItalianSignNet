@@ -2,7 +2,10 @@ import os
 import shutil
 import pandas as pd
 import utility
-from config.costants import *
+from dotenv import load_dotenv
+
+load_dotenv()
+BASE_DIR = os.getenv("BASE_DIR")
 
 def merge_test_data_folders(input_folders, input_directory, output_folder):
     """

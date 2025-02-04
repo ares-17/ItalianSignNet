@@ -7,7 +7,6 @@ import geopy.distance
 import requests
 import json
 from vt2geojson.tools import vt_bytes_to_geojson
-import codes
 import base64
 import concurrent.futures
 from threading import Lock
@@ -15,6 +14,20 @@ import itertools
 from typing import Protocol
 import os
 import utility
+from dotenv import load_dotenv
+
+"""
+Modulo per il download e elaborazione di dataset geospaziali da Mapillary.
+
+Componenti principali:
+- Definizione di enumerazioni e interfacce per tipi di feature e strategie di download
+- Implementazione di selettori per campionamento dati
+- Classe principale Dataminer per gestione configurazioni, download e elaborazione
+- Funzioni di utilità per conversione coordinate
+"""
+
+load_dotenv()
+API_KEY = os.getenv("MAPILLARY_API_KEY")
 
 class Type(Enum):
     ALL = "all"
@@ -87,7 +100,15 @@ class NumberSelector(BaseSelector):
             return mapF_id_list  # Restituisci la lista, anche se vuota
 
 class Dataminer:
-
+    """
+    Classe principale per il data mining da Mapillary.
+    
+    Funzionalità:
+    - Configurazione parametri di download
+    - Download dataset geospaziali
+    - Elaborazione immagini e annotazioni
+    - Gestione multi-thread
+    """
     def __init__(self):
         self.lines = None
         self.Type = Type.ALL.value
@@ -139,7 +160,7 @@ class Dataminer:
 
     def fetch_features(self, type_call, tile_layer, x, y, z):
         """Recupera le feature da Mapillary."""
-        url = f"https://tiles.mapillary.com/maps/vtp/{type_call}/2/{z}/{x}/{y}?access_token={codes.API_KEY}"
+        url = f"https://tiles.mapillary.com/maps/vtp/{type_call}/2/{z}/{x}/{y}?access_token={API_KEY}"
         r = requests.get(url)
         if r.status_code != 200:
             raise requests.exceptions.RequestException(f"Errore nella chiamata API: {r.status_code} - {r.content}")
@@ -148,7 +169,24 @@ class Dataminer:
 
     def downloadGeojson(self, ll_lat, ll_lon, ur_lat, ur_lon, z, outputFolder, rows, cols, configurationFolder='empty',
                         output_filename="tsf_data"):
-        """Downloads GeoJSON data from Mapillary in a grid, limiting the number of features per file."""
+        """
+        Scarica dati GeoJSON organizzati in griglia.
+        
+        Parametri:
+        - ll_lat, ll_lon: Lat/lon lower-left bounding box
+        - ur_lat, ur_lon: Lat/lon upper-right bounding box
+        - z: Livello di zoom
+        - outputFolder: Cartella di output
+        - rows, cols: Dimensione griglia
+        - configurationFolder: Path configurazione personalizzata
+        - output_filename: Nome base file output
+        
+        Funzionalità:
+        - Suddivide l'area in celle
+        - Limita features per file (max 150)
+        - Supporta configurazioni custom
+        - Gestisce errori di download
+        """
 
         lat_step = (ur_lat - ll_lat) / rows
         lon_step = (ur_lon - ll_lon) / cols
@@ -212,7 +250,17 @@ class Dataminer:
                     json.dump(output, f)
 
     def process_data(self, map_feature_id, lock, outputFolderImages, outputFolderAnnotations, custom_signals):
-        """Elabora i dati e scarica immagini e annotazioni."""
+        """
+        Elabora una singola feature geospaziale.
+        
+        Operazioni:
+        - Recupero metadati e immagini associate
+        - Calcolo geometrie poligonali
+        - Verifica presenza segnali personalizzati
+        - Download immagine con controllo concorrenza
+        - Generazione file annotazione JSON
+        - Classificazione posizione geografica
+        """
         images_id_list = []
         annotation_data = {
             "map_feature": {},
@@ -220,7 +268,7 @@ class Dataminer:
         }
         polygon_geometry = None
 
-        header = {'Authorization': 'OAuth {}'.format(codes.API_KEY)}
+        header = {'Authorization': 'OAuth {}'.format(API_KEY)}
         url = 'https://graph.mapillary.com/{}/detections?fields=image,geometry'.format(map_feature_id)
         response = requests.get(url, headers=header)
         data = response.json()
@@ -234,7 +282,7 @@ class Dataminer:
             polygon_geometry = polygon_geometry['mpy-or']['features'][0]['geometry']['coordinates']
 
         url = 'https://graph.mapillary.com/{}?fields=object_value,geometry&access_token={}'.format(
-            map_feature_id, codes.API_KEY
+            map_feature_id, API_KEY
         )
         response = requests.get(url)
         data = response.json()
@@ -254,7 +302,7 @@ class Dataminer:
         annotation_data["image"] = data
 
         # Prima di scaricare l'immagine, controlla se contiene i segnali desiderati
-        url = f"https://graph.mapillary.com/{image_id}/detections?fields=value,geometry&access_token={codes.API_KEY}"
+        url = f"https://graph.mapillary.com/{image_id}/detections?fields=value,geometry&access_token={API_KEY}"
         response = requests.get(url)
         detections_data = response.json()["data"]
 
@@ -310,7 +358,7 @@ class Dataminer:
         min_distance = self.dist_max + 1
         selected_image_id = None
         for image_id in imageIdList:
-            header = {'Authorization': 'OAuth {}'.format(codes.API_KEY)}
+            header = {'Authorization': 'OAuth {}'.format(API_KEY)}
             url = 'https://graph.mapillary.com/{}?fields=geometry'.format(image_id)
             response = requests.get(url, headers=header)
             data = response.json()
@@ -322,8 +370,19 @@ class Dataminer:
                 selected_image_id = image_id
         return selected_image_id, min_distance
 
-# function to convert bbox coordinates
+
 def deg2num(lat_deg, lon_deg, zoom):
+    """
+    Converte coordinate geografiche a coordinate tile XYZ.
+    
+    Parametri:
+    - lat_deg: Latitudine decimale
+    - lon_deg: Longitudine decimale
+    - zoom: Livello di zoom
+    
+    Restituisce:
+    - (x, y): Coordinate tile
+    """
     lat_rad = math.radians(lat_deg)
     n = 2.0 ** zoom
     x_tile = int((lon_deg + 180.0) / 360.0 * n)

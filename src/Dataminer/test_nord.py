@@ -1,23 +1,39 @@
 from Dataminer import Dataminer, Type, NumberSelector
 import utility
 import os
-from config.costants import *
+from dotenv import load_dotenv
+from pathlib import Path
+
+"""
+Script per il download e processing di dati geospaziali dall'API Mapillary.
+
+Flusso principale:
+1. Configurazione parametri di estrazione
+2. Gestione cartelle e percorsi
+3. Download dati grezzi in formato GeoJSON
+4. Selezione features e download immagini/annotazioni
+5. Post-processing con utilità esterne
+
+Dipendenza principale: modulo Dataminer.py
+"""
+
+load_dotenv()
+BASE_DIR = Path(os.getenv("BASE_DIR"))
 
 n_threads = 4
 
-cartellaBase = BASE_DIR / 'Testing' #Inserire percorso locale per testing
+cartellaBase = BASE_DIR / 'testing' #Inserire percorso locale per testing
 nome_esecuzione = "NordOvest_data" #Inserire nome cartella esecuzione da generare
 
-# Impostazione coordinate - da modificare in base all'area
-z = 14
-ll_lat = 44.071020
-ll_lon = 7.754966
+# Coordinate area di interesse (bounding box)
+z = 14  # Livello di zoom per le tile
+ll_lat = 44.071020  # Latitudine angolo inferiore sinistro
+ll_lon = 7.754966   # Longitudine angolo inferiore sinistro
+ur_lat = 46.167202  # Latitudine angolo superiore destro
+ur_lon = 9.991301   # Longitudine angolo superiore destro
 
-ur_lat = 46.167202
-ur_lon = 9.991301
 
-
-# Percorsi delle cartelle
+# Configurazione percorsi di output
 geojsonFolder = os.path.join(cartellaBase, nome_esecuzione, "geojson_folder")
 outputFolderImages = os.path.join(cartellaBase, nome_esecuzione, "images")
 outputFolderAnnotationsImage = os.path.join(cartellaBase, nome_esecuzione, "annotations_image")
@@ -28,7 +44,7 @@ outputRitagli = os.path.join(cartellaBase, nome_esecuzione, "resized_images")
 percorso_esecuzione = os.path.join(cartellaBase, nome_esecuzione)
 geojson_file_path = os.path.join(geojsonFolder, "mapF_id_list.txt")
 
-percorso_configurazione = BASE_DIR / 'Testing' / 'custom_config.txt'
+percorso_configurazione = BASE_DIR / 'custom_config.txt'
 with open(percorso_configurazione, 'r') as f:
     custom_signals = [line.strip() for line in f]
 

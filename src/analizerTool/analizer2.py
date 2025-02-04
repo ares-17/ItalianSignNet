@@ -2,7 +2,10 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from config.costants import *
+from dotenv import load_dotenv
+
+load_dotenv()
+BASE_DIR = os.getenv("BASE_DIR")
 
 # Carica il file CSV creato dopo il merge
 csv_file = os.path.join(BASE_DIR, 'src', 'predictionToolV2', 'merged_file.csv')
