@@ -3,6 +3,8 @@ import utility
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+import time
+from regioni import REGIONI
 
 """
 Script per il download e processing di dati geospaziali dall'API Mapillary.
@@ -27,10 +29,10 @@ nome_esecuzione = "NordOvest_data" #Inserire nome cartella esecuzione da generar
 
 # Coordinate area di interesse (bounding box)
 z = 14  # Livello di zoom per le tile
-ll_lat = 44.071020  # Latitudine angolo inferiore sinistro
-ll_lon = 7.754966   # Longitudine angolo inferiore sinistro
-ur_lat = 46.167202  # Latitudine angolo superiore destro
-ur_lon = 9.991301   # Longitudine angolo superiore destro
+ll_lat= 38.851241
+ll_lon= 8.156250
+ur_lat= 41.244772
+ur_lon= 9.711914
 
 
 # Configurazione percorsi di output
@@ -54,6 +56,14 @@ data.chooseConfiguration(Type.CUSTOM)
 #Impostazione righe e colonne in cui suddividere l'area
 rows = 6
 cols = 12
+
+def stampa_progresso(regione, start_time):
+    tempo_trascorso = time.time() - start_time
+    print(f"\nInizio elaborazione: {regione['nome']}")
+    print(f"Bounding Box:")
+    print(f"    LAT: {regione['ll_lat']:.6f} → {regione['ur_lat']:.6f}")
+    print(f"    LON: {regione['ll_lon']:.6f} → {regione['ur_lon']:.6f}")
+    print(f"    Tempo trascorso: {tempo_trascorso:.1f}s")
 
 if os.path.exists(percorso_esecuzione):
     if os.path.exists(geojson_file_path) and not os.listdir(outputRitagli):

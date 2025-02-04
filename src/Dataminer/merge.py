@@ -62,7 +62,7 @@ def list_available_folders(directory="."):
     return folders
 
 
-input_directory = BASE_DIR / "Testing"
+input_directory = BASE_DIR / "testing"
 
 try:
     available_folders = list_available_folders(input_directory)
