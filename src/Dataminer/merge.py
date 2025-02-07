@@ -3,9 +3,10 @@ import shutil
 import pandas as pd
 import utility
 from dotenv import load_dotenv
+from pathlib import Path
 
 load_dotenv()
-BASE_DIR = os.getenv("BASE_DIR")
+BASE_DIR = Path(os.getenv("BASE_DIR"))
 
 def merge_test_data_folders(input_folders, input_directory, output_folder):
     """

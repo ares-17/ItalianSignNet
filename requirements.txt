@@ -15,8 +15,11 @@ vt2geojson==0.2.1
 
 # Computer Vision & ML
 opencv-python-headless==4.9.0.80
-tensorflow==2.15.0
+tensorflow==2.16.1
 
 # Utilities & Networking
 requests==2.31.0
 protobuf==3.20.3  # Necessario per prevenire conflitti con TensorFlow
+
+# Environment Variables
+python-dotenv==1.0.0

@@ -25,7 +25,7 @@ BASE_DIR = Path(os.getenv("BASE_DIR"))
 n_threads = 4
 
 cartellaBase = BASE_DIR / 'testing' #Inserire percorso locale per testing
-nome_esecuzione = "NordOvest_data" #Inserire nome cartella esecuzione da generare
+nome_esecuzione = "nord_est" #Inserire nome cartella esecuzione da generare
 
 # Coordinate area di interesse (bounding box)
 z = 14  # Livello di zoom per le tile

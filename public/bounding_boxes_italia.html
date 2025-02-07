@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    
+        <script>
+            L_NO_TOUCH = false;
+            L_DISABLE_3D = false;
+        </script>
+    
+    <style>html, body {width: 100%;height: 100%;margin: 0;padding: 0;}</style>
+    <style>#map {position:absolute;top:0;bottom:0;right:0;left:0;}</style>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_8b17ffcbfb81d7d02458c5e7ccb602a0 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+        
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_8b17ffcbfb81d7d02458c5e7ccb602a0" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_8b17ffcbfb81d7d02458c5e7ccb602a0 = L.map(
+                "map_8b17ffcbfb81d7d02458c5e7ccb602a0",
+                {
+                    center: [42.0, 12.5],
+                    crs: L.CRS.EPSG3857,
+                    zoom: 6,
+                    zoomControl: true,
+                    preferCanvas: false,
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_24ab6cbbb1d1967ff0da99f8f0f8e639 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {"attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors", "detectRetina": false, "maxNativeZoom": 19, "maxZoom": 19, "minZoom": 0, "noWrap": false, "opacity": 1, "subdomains": "abc", "tms": false}
+            );
+        
+    
+            tile_layer_24ab6cbbb1d1967ff0da99f8f0f8e639.addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+            var poly_line_d31fd77bc234525214c41a2b13d3eef1 = L.polyline(
+                [[36.619987, 12.425758], [38.321316, 12.425758], [38.321316, 15.658203], [36.619987, 15.658203], [36.619987, 12.425758]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_e69e4118851189459bcfc2298d47b2f8 = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_52ae3fb172bda949a7c9f43f44ee75ed = $(`<div id="html_52ae3fb172bda949a7c9f43f44ee75ed" style="width: 100.0%; height: 100.0%;">Sicilia</div>`)[0];
+                popup_e69e4118851189459bcfc2298d47b2f8.setContent(html_52ae3fb172bda949a7c9f43f44ee75ed);
+            
+        
+
+        poly_line_d31fd77bc234525214c41a2b13d3eef1.bindPopup(popup_e69e4118851189459bcfc2298d47b2f8)
+        ;
+
+        
+    
+    
+            var poly_line_10b94ce6672b3d67e45a61bb1c17cb40 = L.polyline(
+                [[38.851241, 8.15625], [41.261291, 8.15625], [41.261291, 9.843657], [38.851241, 9.843657], [38.851241, 8.15625]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_9460530f9f29e0efe3f7884e77ad4252 = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_ff031fd738b8723b0a65e0eda991a234 = $(`<div id="html_ff031fd738b8723b0a65e0eda991a234" style="width: 100.0%; height: 100.0%;">Sardegna</div>`)[0];
+                popup_9460530f9f29e0efe3f7884e77ad4252.setContent(html_ff031fd738b8723b0a65e0eda991a234);
+            
+        
+
+        poly_line_10b94ce6672b3d67e45a61bb1c17cb40.bindPopup(popup_9460530f9f29e0efe3f7884e77ad4252)
+        ;
+
+        
+    
+    
+            var poly_line_403f9057e4c2b88a57447e915caa76f1 = L.polyline(
+                [[37.631635, 15.658203], [39.770548, 15.658203], [39.770548, 17.484778], [37.631635, 17.484778], [37.631635, 15.658203]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_3de12bd5daa8a38ab5a68f9706c7c612 = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_d309a3aa30841f9ec06e7e84680b7217 = $(`<div id="html_d309a3aa30841f9ec06e7e84680b7217" style="width: 100.0%; height: 100.0%;">Calabria</div>`)[0];
+                popup_3de12bd5daa8a38ab5a68f9706c7c612.setContent(html_d309a3aa30841f9ec06e7e84680b7217);
+            
+        
+
+        poly_line_403f9057e4c2b88a57447e915caa76f1.bindPopup(popup_3de12bd5daa8a38ab5a68f9706c7c612)
+        ;
+
+        
+    
+    
+            var poly_line_5c86bf13e3c6155ed12cb0fd394edfb5 = L.polyline(
+                [[39.770548, 14.084473], [40.676472, 14.084473], [40.676472, 18.566895], [39.770548, 18.566895], [39.770548, 14.084473]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_f064dba6ea5e0e82fa1579157347fb2d = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_ac06f22b6bb3def8f4787093afb3b569 = $(`<div id="html_ac06f22b6bb3def8f4787093afb3b569" style="width: 100.0%; height: 100.0%;">Basilicata</div>`)[0];
+                popup_f064dba6ea5e0e82fa1579157347fb2d.setContent(html_ac06f22b6bb3def8f4787093afb3b569);
+            
+        
+
+        poly_line_5c86bf13e3c6155ed12cb0fd394edfb5.bindPopup(popup_f064dba6ea5e0e82fa1579157347fb2d)
+        ;
+
+        
+    
+    
+            var poly_line_6938a916689cbf315f73075d13841279 = L.polyline(
+                [[40.676472, 13.765869], [41.20139, 13.765869], [41.20139, 17.984619], [40.676472, 17.984619], [40.676472, 13.765869]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_10b3ee5f55f09cdb916344fd36113684 = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_2ffe0db1c9cde54e521853691bea1fba = $(`<div id="html_2ffe0db1c9cde54e521853691bea1fba" style="width: 100.0%; height: 100.0%;">Centro Sud</div>`)[0];
+                popup_10b3ee5f55f09cdb916344fd36113684.setContent(html_2ffe0db1c9cde54e521853691bea1fba);
+            
+        
+
+        poly_line_6938a916689cbf315f73075d13841279.bindPopup(popup_10b3ee5f55f09cdb916344fd36113684)
+        ;
+
+        
+    
+    
+            var poly_line_690f68b58d0a2335cdfae03d3f11e772 = L.polyline(
+                [[41.20139, 12.030029], [42.000325, 12.030029], [42.000325, 16.413574], [41.20139, 16.413574], [41.20139, 12.030029]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_50f097bd49bec99c77b61d97f3217702 = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_d448aece1ac1ef20637ef810a3e8aba1 = $(`<div id="html_d448aece1ac1ef20637ef810a3e8aba1" style="width: 100.0%; height: 100.0%;">Centro Italia</div>`)[0];
+                popup_50f097bd49bec99c77b61d97f3217702.setContent(html_d448aece1ac1ef20637ef810a3e8aba1);
+            
+        
+
+        poly_line_690f68b58d0a2335cdfae03d3f11e772.bindPopup(popup_50f097bd49bec99c77b61d97f3217702)
+        ;
+
+        
+    
+    
+            var poly_line_84f4a7c270a5e24648980708e1dbcbcf = L.polyline(
+                [[42.000325, 11.074725], [42.463993, 11.074725], [42.463993, 14.826124], [42.000325, 14.826124], [42.000325, 11.074725]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_ba9a8e19d76c91892cc9cb8464004184 = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_245f2ed99813164dd39accd1057103da = $(`<div id="html_245f2ed99813164dd39accd1057103da" style="width: 100.0%; height: 100.0%;">Alto lazio</div>`)[0];
+                popup_ba9a8e19d76c91892cc9cb8464004184.setContent(html_245f2ed99813164dd39accd1057103da);
+            
+        
+
+        poly_line_84f4a7c270a5e24648980708e1dbcbcf.bindPopup(popup_ba9a8e19d76c91892cc9cb8464004184)
+        ;
+
+        
+    
+    
+            var poly_line_0ada2f16b98181064f36bed71f930b84 = L.polyline(
+                [[42.463993, 10.129395], [43.044805, 10.129395], [43.044805, 14.172363], [42.463993, 14.172363], [42.463993, 10.129395]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_a2ff1439e6a621bc8b6c213a611c8767 = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_600fbd550d40c2ef790c809d536142c3 = $(`<div id="html_600fbd550d40c2ef790c809d536142c3" style="width: 100.0%; height: 100.0%;">Umbria</div>`)[0];
+                popup_a2ff1439e6a621bc8b6c213a611c8767.setContent(html_600fbd550d40c2ef790c809d536142c3);
+            
+        
+
+        poly_line_0ada2f16b98181064f36bed71f930b84.bindPopup(popup_a2ff1439e6a621bc8b6c213a611c8767)
+        ;
+
+        
+    
+    
+            var poly_line_67b9cad57ba3627521b10772b7b30cd9 = L.polyline(
+                [[43.054841, 9.931641], [43.937462, 9.931641], [43.937462, 13.844147], [43.054841, 13.844147], [43.054841, 9.931641]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_429dec5c33b604ce24cfbb413a25266f = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_040402f447f29563b6cc6fd8026c8ee3 = $(`<div id="html_040402f447f29563b6cc6fd8026c8ee3" style="width: 100.0%; height: 100.0%;">Toscana</div>`)[0];
+                popup_429dec5c33b604ce24cfbb413a25266f.setContent(html_040402f447f29563b6cc6fd8026c8ee3);
+            
+        
+
+        poly_line_67b9cad57ba3627521b10772b7b30cd9.bindPopup(popup_429dec5c33b604ce24cfbb413a25266f)
+        ;
+
+        
+    
+    
+            var poly_line_f2d1a11589f74d943dc8404174c2dc21 = L.polyline(
+                [[43.937462, 7.756348], [45.844108, 7.756348], [45.844108, 12.667236], [43.937462, 12.667236], [43.937462, 7.756348]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_0771c10c5d33f34931d943e955414383 = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_8c549217ce4fb4edeee1f02a06eeab12 = $(`<div id="html_8c549217ce4fb4edeee1f02a06eeab12" style="width: 100.0%; height: 100.0%;">Nord</div>`)[0];
+                popup_0771c10c5d33f34931d943e955414383.setContent(html_8c549217ce4fb4edeee1f02a06eeab12);
+            
+        
+
+        poly_line_f2d1a11589f74d943dc8404174c2dc21.bindPopup(popup_0771c10c5d33f34931d943e955414383)
+        ;
+
+        
+    
+    
+            var poly_line_e3b02abd30a2a4518923821b0315b629 = L.polyline(
+                [[44.245199, 7.097168], [45.859412, 7.097168], [45.859412, 7.756348], [44.245199, 7.756348], [44.245199, 7.097168]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_6e1e762ba6a38d15651aec093de6a43b = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_14e306cdfcf8bf6e35dca07958cc3a7e = $(`<div id="html_14e306cdfcf8bf6e35dca07958cc3a7e" style="width: 100.0%; height: 100.0%;">Valle Aosta</div>`)[0];
+                popup_6e1e762ba6a38d15651aec093de6a43b.setContent(html_14e306cdfcf8bf6e35dca07958cc3a7e);
+            
+        
+
+        poly_line_e3b02abd30a2a4518923821b0315b629.bindPopup(popup_6e1e762ba6a38d15651aec093de6a43b)
+        ;
+
+        
+    
+    
+            var poly_line_3def82f109e63602ac52218a13a43179 = L.polyline(
+                [[45.844108, 10.255737], [46.54375, 10.255737], [46.54375, 13.359375], [45.844108, 13.359375], [45.844108, 10.255737]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": false, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 2.5}
+            ).addTo(map_8b17ffcbfb81d7d02458c5e7ccb602a0);
+        
+    
+        var popup_5f635eec4946f85862fef04fec837e1b = L.popup({"maxWidth": "100%"});
+
+        
+            
+                var html_35707ae3fa188cc9f8ff0f5e3568a8fe = $(`<div id="html_35707ae3fa188cc9f8ff0f5e3568a8fe" style="width: 100.0%; height: 100.0%;">Basso Trentino</div>`)[0];
+                popup_5f635eec4946f85862fef04fec837e1b.setContent(html_35707ae3fa188cc9f8ff0f5e3568a8fe);
+            
+        
+
+        poly_line_3def82f109e63602ac52218a13a43179.bindPopup(popup_5f635eec4946f85862fef04fec837e1b)
+        ;
+
+        
+    
+</script>
+</html>
