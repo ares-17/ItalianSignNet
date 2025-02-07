@@ -1,4 +1,4 @@
-REGIONI = {
+BOUNDING_BOXES = {
     "sicilia": {
         "ll_lat": 36.619987,
         "ll_lon": 12.425758,

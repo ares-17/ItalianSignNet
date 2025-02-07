@@ -75,3 +75,9 @@ Si consiglia caldamente di non committare la cartella associata all'ambiente vir
 2. Posizionare il CSV dei risultati in:  
    `BASE_DIR/src/predictionToolV2/merged_file.csv`
 3. Eseguire lo script per generare report e grafici
+
+## Visualizzazione bounding boxes
+Per visualizzare e modifica le bounding boxes considerate nel processo di datamining è fornito lo script `create_bounding_boxes_map.py` che in combinazione con `src\dataminer\bounding_boxes.py` produce in output il file `public\bounding_boxes_italia.html`.
+
+Le bounding boxes attualmente in uso sono le seguenti.
+![Bounding Boxes italiane](public/bounding_boxes_italia.html "Bounding Boxes italiane")
