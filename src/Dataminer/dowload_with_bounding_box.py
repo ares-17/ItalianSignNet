@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 import time
-from regioni import REGIONI
+import argparse
 
 """
 Script per il download e processing di dati geospaziali dall'API Mapillary.
@@ -21,18 +21,27 @@ Dipendenza principale: modulo Dataminer.py
 
 load_dotenv()
 BASE_DIR = Path(os.getenv("BASE_DIR"))
-
 n_threads = 4
-
 cartellaBase = BASE_DIR / 'testing' #Inserire percorso locale per testing
-nome_esecuzione = "sud" #Inserire nome cartella esecuzione da generare
-
-# Coordinate area di interesse (bounding box)
 z = 14  # Livello di zoom per le tile
-ll_lat= 39.909736
-ll_lon= 14.106445
-ur_lat= 41.178654
-ur_lon= 18.500977
+
+
+parser = argparse.ArgumentParser(
+    description="Script per il download e processing di dati geospaziali dall'API Mapillary."
+)
+parser.add_argument("--ll_lat", type=float, default=41.902277, help="Latitudine inferiore (Lower Left)")
+parser.add_argument("--ll_lon", type=float, default=12.250977, help="Longitudine inferiore (Lower Left)")
+parser.add_argument("--ur_lat", type=float, default=43.897892, help="Latitudine superiore (Upper Right)")
+parser.add_argument("--ur_lon", type=float, default=14.458008, help="Longitudine superiore (Upper Right)")
+parser.add_argument("--num_features", type=int, default=10, help="Numero di feature da estrarre da ogni file GeoJSON")
+parser.add_argument("--nome_esecuzione", type=str, default="centro", help="Nome dell'esecuzione")
+args = parser.parse_args()
+
+ll_lat = args.ll_lat
+ll_lon = args.ll_lon
+ur_lat = args.ur_lat
+ur_lon = args.ur_lon
+nome_esecuzione = args.nome_esecuzione
 
 
 # Configurazione percorsi di output
@@ -89,20 +98,10 @@ if os.path.exists(percorso_esecuzione):
                                                                 f"{nome_esecuzione}_row{row}_col{col}.geojson"))
 
                 mapF_id_list = []  # Crea la lista di ID delle feature
-                while True:   # Chiedi all'utente il numero di feature per file
-                    try:
-                        num_features_per_file = int(input(f"Inserisci il numero di feature da estrarre da OGNI file GeoJSON: "))
-                        if num_features_per_file >= 0:
-                            break
-                        else:
-                            print("Valore non valido. Inserisci un numero non negativo.")
-                    except ValueError:
-                        print("Input non valido. Inserisci un numero.")
-
                 for geojsonFilePath in geojsonFilePathList:  # Itera sui file GeoJSON
                     n = data.getNGeojson(geojsonFilePath)
                     if n > 0:
-                        data.setSelector(number=min(num_features_per_file, n))
+                        data.setSelector(number=min(args.num_features, n))
                         data.setDistance(min=11, max=40) # Imposta distanza min e max
                         data.setPolygon(True)
 
@@ -142,21 +141,11 @@ if os.path.exists(percorso_esecuzione):
                     geojsonFilePathList.append(os.path.join(geojsonFolder, f"{nome_esecuzione}_row{row}_col{col}.geojson"))
 
             mapF_id_list = []  # Crea la lista di ID delle feature
-            while True:  # Chiedi all'utente il numero di feature per file
-                try:
-                    num_features_per_file = int(
-                        input(f"Inserisci il numero di feature da estrarre da OGNI file GeoJSON: "))
-                    if num_features_per_file >= 0:
-                        break
-                    else:
-                        print("Valore non valido. Inserisci un numero non negativo.")
-                except ValueError:
-                    print("Input non valido. Inserisci un numero.")
 
             for geojsonFilePath in geojsonFilePathList:  # Itera sui file GeoJSON
                 n = data.getNGeojson(geojsonFilePath)
                 if n > 0:
-                    data.setSelector(number=min(num_features_per_file, n))  # Imposta il numero di feature da estrarre
+                    data.setSelector(number=min(args.num_features, n))  # Imposta il numero di feature da estrarre
                     data.setDistance(min=11, max=40)  # Imposta distanza min e max
                     data.setPolygon(True)
 
@@ -184,16 +173,6 @@ if os.path.exists(percorso_esecuzione):
             exit()
 else:  # Nuova esecuzione
     utility.folder_maker(cartellaBase, nome_esecuzione)
-    while True:
-        try:
-            num_features_per_file = int(
-                input(f"Inserisci il numero di feature da estrarre da OGNI file GeoJSON: "))
-            if num_features_per_file >= 0:
-                break
-            else:
-                print("Valore non valido. Inserisci un numero non negativo.")
-        except ValueError:
-            print("Input non valido. Inserisci un numero.")
     data.downloadGeojson(ll_lat, ll_lon, ur_lat, ur_lon, z, geojsonFolder, rows, cols, percorso_configurazione,
                          nome_esecuzione)
     geojsonFilePathList = []  # Crea la lista di percorsi GeoJSON
@@ -206,7 +185,7 @@ else:  # Nuova esecuzione
     for geojsonFilePath in geojsonFilePathList:  # Itera sui file GeoJSON
         n = data.getNGeojson(geojsonFilePath)
         if n > 0:
-            data.setSelector(number=min(num_features_per_file, n))  # Imposta il numero di feature da estrarre
+            data.setSelector(number=min(args.num_features, n))  # Imposta il numero di feature da estrarre
             data.setDistance(min=11, max=40)  # Imposta distanza min e max
             data.setPolygon(True)
 

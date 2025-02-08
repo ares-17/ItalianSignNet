@@ -1,12 +1,7 @@
-# Istruzioni aggiuntive nuova disposizione
-## Visualizzazione bounding boxes
-Per visualizzare e modifica le bounding boxes considerate nel processo di datamining è fornito lo script `create_bounding_boxes_map.py` che in combinazione con `src\dataminer\bounding_boxes.py` produce in output il file `public\bounding_boxes_italia.html`.
-
-Le bounding boxes attualmente in uso sono le seguenti:
-![Bounding Boxes italiane](public/bounding_boxes_italia.png "Bounding Boxes italiane")
-
-Per utilizzare gli script Python occorre creare un file `.env` a livello di progetto, inserendo i valori indicati dagli esempi del file `.env.dummy`.
-
+# Datamining e classificazione cartelli stradali italiani
+## Installazione
+Per installare il progetto clonare il repository, creare il file `.env` nella cartella principale del progetto come indicato in `.env.dummy` e configurare le librerie.
+ 
 ### Configurazione librerie
 Si consiglia di gestire le librerie in ambienti virtuali, come offerto da python venv.
 ```bash
@@ -26,6 +21,23 @@ pip install -r requirements.txt
 deactivate
 ```
 Si consiglia caldamente di non committare la cartella associata all'ambiente virtuale.
+
+## Dataminer
+La cartella Dataminer raggruppa gli script del datamining dei cartelli stradali italiani.
+
+A partire dalle bounding boxes definite in `bounding_boxes.py`, sono eseguiti per ognuna di queste i file `Dataminer` e `utility` per memorizzare i cartelli stradali italiani in base ai parametri in essi scolpiti. 
+
+Lo script `run_bounding_boxes` è aggiunto per facilitare il processo di datamining eseguendo la memorizzazione dei cartelli per tutte le regioni geografiche definite, una per volta. Al momento, l'unico parametro di configurazione è `NUM_FEATURES` che attesta il numero di feature da considerare per ciascuna esecuzione.
+
+Il file `merge` facilita l'unione delle cartelle generate per ognuna delle regioni geografiche.
+
+## Visualizzazione bounding boxes
+Per visualizzare e modifica le bounding boxes considerate nel processo di datamining è fornito lo script `create_bounding_boxes_map.py` che in combinazione con `src\dataminer\bounding_boxes.py` produce in output il file `public\bounding_boxes_italia.html`.
+
+Le bounding boxes attualmente in uso sono le seguenti:
+![Bounding Boxes italiane](public/bounding_boxes_italia.png "Bounding Boxes italiane")
+
+Per utilizzare gli script Python occorre creare un file `.env` a livello di progetto, inserendo i valori indicati dagli esempi del file `.env.dummy`.
 
 ## analizer2.py
 ### Funzionalità Principali
@@ -64,7 +76,7 @@ Si consiglia caldamente di non committare la cartella associata all'ambiente vir
    `BASE_DIR/src/predictionToolV2/merged_file.csv`
 3. Eseguire lo script per generare report e grafici
 
-# Istruzioni da aggiornare vecchio README
+# Vecchio README
 Dataminer: Tool per il mining di dataset
 - test_nord.py: esempio di main, modificare le impostazioni come indicato. E' possibile replicare lo stesso main su più file .py per esecuzione parallela.
 - merge.py: Tool di merge, modificare la cartella di input inserendo la stessa cartella delle esecuzioni all'interno del main
