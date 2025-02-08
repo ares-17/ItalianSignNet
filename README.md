@@ -37,9 +37,8 @@ Per visualizzare e modifica le bounding boxes considerate nel processo di datami
 Le bounding boxes attualmente in uso sono le seguenti:
 ![Bounding Boxes italiane](public/bounding_boxes_italia.png "Bounding Boxes italiane")
 
-Per utilizzare gli script Python occorre creare un file `.env` a livello di progetto, inserendo i valori indicati dagli esempi del file `.env.dummy`.
 
-## analizer2.py
+## Da concludere: analizer2.py
 ### Funzionalità Principali
 
 #### 1. **Analisi Geografica**
