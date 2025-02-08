@@ -1,6 +1,8 @@
 # Datamining e classificazione cartelli stradali italiani
 ## Installazione
 Per installare il progetto clonare il repository, creare il file `.env` nella cartella principale del progetto come indicato in `.env.dummy` e configurare le librerie.
+
+Nota: al momento i file in `src/predictionToolV2/traffic-signs-data` che costituiscono il dataset del modello non sono presenti nel repository poiché eccedono i limiti di spazio che un singolo file può avere secondo le direttive di GitHub. 
  
 ### Configurazione librerie
 Si consiglia di gestire le librerie in ambienti virtuali, come offerto da python venv.
