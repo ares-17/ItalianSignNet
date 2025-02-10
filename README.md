@@ -39,6 +39,8 @@ Per visualizzare e modifica le bounding boxes considerate nel processo di datami
 Le bounding boxes attualmente in uso sono le seguenti:
 ![Bounding Boxes italiane](public/bounding_boxes_italia.png "Bounding Boxes italiane")
 
+Che producono i seguenti markers:
+![Markers considerati](public/markers_italia.png "Markers considerati")
 
 ## Da concludere: analizer2.py
 ### Funzionalità Principali
