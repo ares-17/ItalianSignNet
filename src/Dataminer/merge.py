@@ -8,11 +8,21 @@ from pathlib import Path
 load_dotenv()
 BASE_DIR = Path(os.getenv("BASE_DIR"))
 
+# Boolean options
+MERGE_FULLSIZE_IMAGES = os.getenv("MERGE_FULLSIZE_IMAGES", "false").lower() in ("true", "1", "yes")
+MERGE_BOUNDED_IMAGES = os.getenv("MERGE_BOUNDED_IMAGES", "false").lower() in ("true", "1", "yes")
+
 def merge_test_data_folders(input_folders, input_directory, output_folder):
     """
     Unisce le cartelle Test_data specificate, inclusi i file annotations.csv.
     """
-    subfolders = ["annotations_image", "bounded_images", "geojson_folder", "images", "resized_images", "signal_catalog"]
+    subfolders = ["annotations_image", "geojson_folder", "resized_images", "signal_catalog"]
+
+    if MERGE_FULLSIZE_IMAGES:
+        subfolders.append("images")
+
+    if MERGE_BOUNDED_IMAGES:
+        subfolders.append("bounded_images")
 
     output_folder_path = os.path.join(input_directory, output_folder)
     os.makedirs(output_folder_path, exist_ok=True)
@@ -37,25 +47,35 @@ def merge_test_data_folders(input_folders, input_directory, output_folder):
                     s = os.path.join(source_path, item)
                     d = os.path.join(destination_path, item)
 
-                    if os.path.isdir(s):
-                        shutil.copytree(s, d, dirs_exist_ok=True)
-                    else:
-                        shutil.copy2(s, d)
+                    try:
+                        if os.path.isdir(s):
+                            shutil.copytree(s, d, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(s, d)
+                    except Exception as e:
+                        print(f"Errore nel copiare {s} → {d}: {e}")
 
         annotations_path = os.path.join(source_folder, "annotations.csv")
         if os.path.exists(annotations_path):
             try:
                 df = pd.read_csv(annotations_path)
-                all_annotations.append(df)
+                if not df.empty:
+                    all_annotations.append(df)
+                else:
+                    print(f"Avviso: Il file annotations.csv in {folder_name} è vuoto.")
             except pd.errors.EmptyDataError:
-                print(f"Avviso: Il file annotations.csv in {folder_name} è vuoto.")
+                print(f"Avviso: Errore nel leggere annotations.csv in {folder_name} (file vuoto o corrotto).")
         else:
             print(f"Avviso: Il file annotations.csv non è presente in {folder_name}.")
 
     if all_annotations:
-        combined_annotations = pd.concat(all_annotations, ignore_index=True)
-        combined_annotations.to_csv(os.path.join(output_folder_path, "annotations.csv"), index=False)
-        print("File annotations.csv uniti con successo.")
+        try:
+            combined_annotations = pd.concat(all_annotations, ignore_index=True)
+            combined_annotations.to_csv(os.path.join(output_folder_path, "annotations.csv"), index=False)
+            print("File annotations.csv uniti con successo.")
+        except Exception as e:
+            print(f"Errore nella fusione del file annotations.csv: {e}")
+
 
 
 def list_available_folders(directory="."):

@@ -208,3 +208,7 @@ utility.bounding(outputFolderImages, outputFolderAnnotationsImage, outputFolderB
 utility.csv_maker(outputFolderAnnotationsImage, outputFolderCSV, nome_esecuzione)
 utility.resizer(outputFolderImages, outputFolderAnnotationsImage, outputRitagli, custom_signals, percorso_esecuzione)
 utility.map_maker(outputFolderAnnotationsImage, ll_lat, ll_lon, ur_lat, ur_lon, nome_esecuzione, cartellaBase)
+
+# Libera spazio occupato da cartelle con immagini originali. Rimovere le seguenti righe se le immagini originali sono necessarie
+utility.safe_clear_folder(outputFolderBounded)
+utility.safe_clear_folder(outputFolderImages)
