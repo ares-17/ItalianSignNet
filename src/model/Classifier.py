@@ -15,13 +15,13 @@ load_dotenv()
 BASE_DIR = os.getenv("BASE_DIR")
 
 # Parametri del modello e training
-MODEL_PATH = 'Saved_Models/VGGnet.keras'  # Percorso per salvare/caricare il modello
+MODEL_PATH = 'saved/VGGnet.keras'  # Percorso per salvare/caricare il modello
 EPOCHS = 15
 BATCH_SIZE = 64
 
 # Mapping ClassID to traffic sign names
 signs = []
-with open('../predictionToolV2/signnames.csv', 'r') as csvfile:
+with open('../model/results/signnames.csv', 'r') as csvfile:
     signnames = csv.reader(csvfile, delimiter=',')
     next(signnames, None)
     for row in signnames:
@@ -56,9 +56,9 @@ if os.path.exists(MODEL_PATH):
 else:
     print("Addestramento del modello...")
 
-    training_file = "../predictionToolV2/traffic-signs-data/train.p"
-    validation_file = "../predictionToolV2/traffic-signs-data/valid.p"
-    testing_file = "../predictionToolV2/traffic-signs-data/test.p"
+    training_file = "../model/traffic-signs-data/train.p"
+    validation_file = "../model/traffic-signs-data/valid.p"
+    testing_file = "../model/traffic-signs-data/test.p"
 
     with open(training_file, mode='rb') as f:
         train = pickle.load(f)
@@ -243,12 +243,12 @@ json_folder = BASE_DIR / 'Testing/Test2/annotations_image' # Percorso della cart
 predict_and_save_to_csv(VGGNet_Model, image_folder, json_folder)
 
 #Sostituisci con il percorso del tuo file che contiene le predizioni
-csv1_path = BASE_DIR / 'src/predictionToolV2/predictions.csv'  
+csv1_path = BASE_DIR / 'src/model/results/predictions.csv'  
 
 #Sostituisci con il percorso del file annotations.csv generato del tuo dataset
 csv2_path = BASE_DIR / 'Testing/Test2/annotations.csv'  
 
 
-output_path = "merged_file.csv" # Sostituisci con il percorso desiderato per il file di output
+output_path = "results/merged_file.csv" # Sostituisci con il percorso desiderato per il file di output
 merge_csv_on_filename(csv1_path, csv2_path, output_path)
 

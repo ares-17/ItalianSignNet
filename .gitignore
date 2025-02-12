@@ -149,5 +149,5 @@ cython_debug/
 # For dataminer's file
 testing/
 
-src/predictionToolV2/traffic-signs-data/
-src/analizerTool/.*
+src/model/traffic-signs-data/
+src/stats/.*

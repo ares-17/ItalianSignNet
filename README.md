@@ -2,7 +2,7 @@
 ## Installazione
 Per installare il progetto clonare il repository, creare il file `.env` nella cartella principale del progetto come indicato in `.env.dummy` e configurare le librerie.
 
-Nota: al momento i file in `src/predictionToolV2/traffic-signs-data` che costituiscono il dataset del modello non sono presenti nel repository poiché eccedono i limiti di spazio che un singolo file può avere secondo le direttive di GitHub. 
+Nota: al momento i file in `src/model/traffic-signs-data` che costituiscono il dataset del modello non sono presenti nel repository poiché eccedono i limiti di spazio che un singolo file può avere secondo le direttive di GitHub. 
  
 ### Configurazione librerie
 Si consiglia di gestire le librerie in ambienti virtuali, come offerto da python venv.
@@ -76,7 +76,7 @@ Che producono i seguenti markers:
 ### Utilizzo
 1. Configurare `.env` con percorso dataset (`BASE_DIR`)
 2. Posizionare il CSV dei risultati in:  
-   `BASE_DIR/src/predictionToolV2/merged_file.csv`
+   `BASE_DIR/src/model/merged_file.csv`
 3. Eseguire lo script per generare report e grafici
 
 # Vecchio README
@@ -85,14 +85,14 @@ Dataminer: Tool per il mining di dataset
 - merge.py: Tool di merge, modificare la cartella di input inserendo la stessa cartella delle esecuzioni all'interno del main
 - utility.py : Contiene tutte le funzioni di ritaglio, creazione mappa e creazione CSV, nonché il mapping tra le classi di GTRSB e i nomi delle label impostate da Mapillary
 
-predictionToolV2: Addestramento modello e classificatore immagini. E' presente anche il dataset GTRSB in formato pickle (traffic-signs-data) e i nomi delle classi presenti (signnames.csv)
+model: Addestramento modello e classificatore immagini. E' presente anche il dataset GTRSB in formato pickle (traffic-signs-data) e i nomi delle classi presenti (signnames.csv)
 - Classifier.py: contiene il codice per l'addestramento del modello e i metodi per classificare le immagini.
 NB!!! - E' importante che il dataset su cui si voglia fare analisi sia completo, deve esserci il file annotations.csv all'interno del dataset, inserire il percorso del file all'interno del corrente file.
-In Saved_Models c'è il modello preaddestrato che utilizza il tool (VGGNet a 12 livelli).
+In saved c'è il modello preaddestrato che utilizza il tool (VGGNet a 12 livelli).
 
-analizerTool: Tool che effettua i vari calcoli e crea i grafici partendo dal csv generato dal tool precedente (quello di output quindi, dopo che è stato effettuato il merge).
+stats: Tool che effettua i vari calcoli e crea i grafici partendo dal csv generato dal tool precedente (quello di output quindi, dopo che è stato effettuato il merge).
 
 Test2: Dataset di segnali stradali italiani
 
 ALTRI FILE
-- custom_config.txt : file che contiene la configurazione custom dei segnali stradali. Utilizzando questo file di configurazione (o modificandolo) scarica solo i segnali le cui label sono contenute in questo file. Nella mia configurazione ci sono tutti i segnali appartenenti alle 43 classi del GTRSB
+- traffic-signs.txt : file che contiene la configurazione custom dei segnali stradali. Utilizzando questo file di configurazione (o modificandolo) scarica solo i segnali le cui label sono contenute in questo file. Nella mia configurazione ci sono tutti i segnali appartenenti alle 43 classi del GTRSB

@@ -341,7 +341,7 @@ def safe_clear_folder(folder_path):
         except Exception as e:
             print(f'Failed to delete {file_path}. Reason: {e}')
 
-def is_point_in_italy(lon, lat, geojson_path="italy.geojson"):
+def is_point_in_italy(lon, lat, geojson_path="limits_IT_regions.geojson"):
     with open(geojson_path, 'r') as f:
         italy_geojson = json.load(f)
     point = Point(lon, lat)

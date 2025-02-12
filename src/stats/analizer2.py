@@ -8,11 +8,11 @@ load_dotenv()
 BASE_DIR = os.getenv("BASE_DIR")
 
 # Crea la cartella per i risultati
-output_dir = os.path.join(BASE_DIR, 'src', 'analizerTool', '.results')
+output_dir = os.path.join(BASE_DIR, 'src', 'stats', '.results')
 os.makedirs(output_dir, exist_ok=True)  # Crea la cartella se non esiste
 
 # Carica il file CSV creato dopo il merge
-csv_file = os.path.join(BASE_DIR, 'src', 'predictionToolV2', 'merged_file.csv')
+csv_file = os.path.join(BASE_DIR, 'src', 'model', 'merged_file.csv')
 data = pd.read_csv(csv_file, sep=',')
 print("Colonne del file:", data.columns.tolist())
 
