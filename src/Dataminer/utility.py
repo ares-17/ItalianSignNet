@@ -7,6 +7,7 @@ import pandas as pd
 import folium
 import shutil
 import csv
+from shapely.geometry import shape, Point
 
 
 feature_mapping = {
@@ -339,3 +340,13 @@ def safe_clear_folder(folder_path):
                 shutil.rmtree(file_path)
         except Exception as e:
             print(f'Failed to delete {file_path}. Reason: {e}')
+
+def is_point_in_italy(lon, lat, geojson_path="italy.geojson"):
+    with open(geojson_path, 'r') as f:
+        italy_geojson = json.load(f)
+    point = Point(lon, lat)
+    for feature in italy_geojson["features"]:
+        polygon = shape(feature["geometry"])
+        if polygon.contains(point):
+            return True
+    return False

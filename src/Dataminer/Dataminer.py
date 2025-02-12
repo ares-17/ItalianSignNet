@@ -28,6 +28,7 @@ Componenti principali:
 
 load_dotenv()
 API_KEY = os.getenv("MAPILLARY_API_KEY")
+GEOJSON_ITALY_PATH = os.getenv("GEOJSON_ITALY_PATH")
 
 class Type(Enum):
     ALL = "all"
@@ -289,6 +290,13 @@ class Dataminer:
         annotation_data["map_feature"] = data
         map_feature_coordinates = data['geometry']['coordinates']
 
+        # Controllo: verifico se il punto (assunto in formato [lon, lat])
+        # ricavato dai metadati della feature ricade in Italia.
+        lon, lat = map_feature_coordinates
+        if not utility.is_point_in_italy(lon, lat, GEOJSON_ITALY_PATH):
+            print("La feature non è in Italia. Interruzione dell'elaborazione.")
+            return
+
         with lock:
             image_id, image_distance = self.getDistance(map_feature_coordinates, images_id_list)
         if image_id is None:
@@ -324,8 +332,7 @@ class Dataminer:
                 del annotation_data["image"]['thumb_original_url']
                 annotation_data["map_feature"]['value'] = annotation_data["map_feature"].pop('object_value')
                 annotation_data["map_feature"]['id_map_feature'] = annotation_data["map_feature"].pop('id')
-                annotation_data["map_feature"][
-                    'geometry_map_feature'] = annotation_data["map_feature"].pop('geometry')
+                annotation_data["map_feature"]['geometry_map_feature'] = annotation_data["map_feature"].pop('geometry')
                 annotation_data["image"]['id_image'] = annotation_data["image"].pop('id')
                 annotation_data["image"]['distance(m)'] = math.ceil(image_distance)
                 annotation_data["image"]['geometry_image'] = annotation_data["image"].pop('geometry')
