@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 NUM_FEATURES = int(os.getenv("NUM_FEATURES_BBOX"))
+DOWNLOAD_BBOX_IMAGES_PATH = os.getenv("DOWNLOAD_BBOX_IMAGES_PATH")
 
 def main():
     for region_key, bbox in BOUNDING_BOXES.items():
@@ -14,7 +15,7 @@ def main():
         print(f"Avvio elaborazione per la regione: {region_name}")
 
         args = [
-            "python", "dowload_bbox_images.py",
+            "python", DOWNLOAD_BBOX_IMAGES_PATH,
             "--ll_lat", str(bbox["ll_lat"]),
             "--ll_lon", str(bbox["ll_lon"]),
             "--ur_lat", str(bbox["ur_lat"]),

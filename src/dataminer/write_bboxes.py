@@ -52,7 +52,8 @@ def genera_grid():
                 "ll_lat": bbox[0],
                 "ll_lon": bbox[1],
                 "ur_lat": bbox[2],
-                "ur_lon": bbox[3]
+                "ur_lon": bbox[3],
+                "nome": current_id
             }
 
             bbox_id += 1
@@ -67,6 +68,7 @@ def genera_grid():
             f.write(f'        "ll_lon": {values["ll_lon"]:.6f},\n')
             f.write(f'        "ur_lat": {values["ur_lat"]:.6f},\n')
             f.write(f'        "ur_lon": {values["ur_lon"]:.6f},\n')
+            f.write(f'        "nome": {values["nome"]},\n')
             f.write('    },\n')
         f.write("}\n")
         f.write(f"\n# Total: {len(bounding_boxes)}\n")

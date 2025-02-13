@@ -328,7 +328,7 @@ def clear_folder(folder_path):
             print(f'Failed to delete {file_path}. Reason: {e}')
 
 def safe_clear_folder(folder_path):
-    if not os.path.exists(directory_path):
+    if not os.path.exists(folder_path):
         return
 
     for filename in os.listdir(folder_path):
