@@ -2,7 +2,6 @@ import folium
 import os
 import sys
 
-# Aggiungi il percorso della cartella "utils" al PYTHONPATH
 utils_path = os.path.join(os.path.dirname(__file__), "..")
 sys.path.append(utils_path)
 

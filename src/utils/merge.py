@@ -1,9 +1,15 @@
 import os
 import shutil
+import sys
 import pandas as pd
-import utility
 from dotenv import load_dotenv
 from pathlib import Path
+
+# Aggiungi il percorso della cartella "utils" al PYTHONPATH
+utils_path = os.path.join(os.path.dirname(__file__), "..")
+sys.path.append(utils_path)
+
+import dataminer.utility as utility
 
 load_dotenv()
 BASE_DIR = Path(os.getenv("BASE_DIR"))

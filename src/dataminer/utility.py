@@ -65,7 +65,6 @@ def folder_maker(cartellaBase, nome_esecuzione):
         cartella_completa = os.path.join(cartella_esecuzione, cartella)
         if not os.path.exists(cartella_completa):
             os.makedirs(cartella_completa)
-            print(f"Cartella creata: {cartella_completa}")
 
 def get_bbox_coordinates(detection, image_shape):
   """Decodifica la geometria e calcola le coordinate del bounding box."""

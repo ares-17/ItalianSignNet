@@ -69,7 +69,12 @@ def fetch_features_cached(type_call: str, tile_layer: str, x: int, y: int, z: in
     r = session.get(url)
     r.raise_for_status()
     vt_content = r.content
-    return vt_bytes_to_geojson(vt_content, x, y, z, layer=tile_layer)["features"]
+    try:
+        geojson_data = vt_bytes_to_geojson(vt_content, x, y, z, layer=tile_layer)
+        return geojson_data["features"]
+    except Exception as e:
+        logger.error(f"Errore nel decodificare il vector tile per x:{x}, y:{y}, z:{z} - {e}")
+        return []
 
 # Caching per il recupero della geometria di una immagine (usato in getDistance)
 @lru_cache(maxsize=256)
