@@ -18,6 +18,14 @@ from dotenv import load_dotenv
 from functools import lru_cache
 import functools
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+load_dotenv()
+API_KEY = os.getenv("MAPILLARY_API_KEY")
+GEOJSON_ITALY_PATH = os.getenv("GEOJSON_ITALY_PATH")
+GRID_WORKERS = int(os.getenv("DATAMINER_GRID_WORKERS", 10))
+
+session = requests.Session()
 
 def log_duration(func):
     """Decorator che logga la durata di esecuzione della funzione decorata.
@@ -36,12 +44,6 @@ def log_duration(func):
             print(f"Operazione {func.__name__} completata in {duration:.2f} secondi")
         return result
     return wrapper
-
-load_dotenv()
-API_KEY = os.getenv("MAPILLARY_API_KEY")
-GEOJSON_ITALY_PATH = os.getenv("GEOJSON_ITALY_PATH")
-
-session = requests.Session()
 
 # Caching per le chiamate a fetch_features (tile)
 @lru_cache(maxsize=128)
@@ -212,7 +214,7 @@ class Dataminer:
     @log_duration
     def downloadGeojson(self, ll_lat, ll_lon, ur_lat, ur_lon, z, outputFolder, rows, cols, configurationFolder='empty', output_filename="tsf_data"):
         """
-        Scarica dati GeoJSON organizzati in griglia.
+        Scarica dati GeoJSON organizzati in griglia in parallelo per ogni cella.
         """
         lat_step = (ur_lat - ll_lat) / rows
         lon_step = (ur_lon - ll_lon) / cols
@@ -229,46 +231,60 @@ class Dataminer:
 
                 output = {"type": "FeatureCollection", "features": []}
                 max_features_per_file = 150
+
+                tile_coords = []
+                for x in range(min(cell_llx, cell_urx), max(cell_llx, cell_urx) + 1):
+                    for y in range(min(cell_lly, cell_ury), max(cell_lly, cell_ury) + 1):
+                        tile_coords.append((x, y))
+
                 features_count = 0
 
-                try:
-                    for x in range(min(cell_llx, cell_urx), max(cell_llx, cell_urx) + 1):
-                        for y in range(min(cell_lly, cell_ury), max(cell_lly, cell_ury) + 1):
-                            if features_count >= max_features_per_file:
-                                break
-
-                            if self.Type == "custom":
-                                if configurationFolder == "empty":
-                                    raise ValueError("Con la configurazione custom occorre indicare una cartella di configurazione")
-                                self.getCustomConfiguration(configurationFolder)
-                                features = self.fetch_features("mly_map_feature_traffic_sign", "traffic_sign", x, y, z)
-                                for f in features:
-                                    for elem in self.lines:
-                                        if elem in f['properties']['value']:
-                                            output['features'].append(f)
-                                            features_count += 1
-                            elif self.Type == "all":
-                                features = self.fetch_features("mly_map_feature_traffic_sign", "traffic_sign", x, y, z)
-                                output['features'].extend(features)
-                                features_count += len(features)
-                            else:
-                                type_call = "mly_map_feature_point" if self.Type == "marking" else "mly_map_feature_traffic_sign"
-                                tile_layer = "point" if self.Type == "marking" else "traffic_sign"
-                                features = self.fetch_features(type_call, tile_layer, x, y, z)
-                                for f in features:
-                                    if self.Type in f['properties']['value']:
+                # Usa un ThreadPoolExecutor per fare richieste in parallelo
+                with ThreadPoolExecutor(max_workers=GRID_WORKERS) as executor:
+                    future_to_tile = {
+                        executor.submit(self.fetch_features, 
+                                        "mly_map_feature_traffic_sign" if self.Type in ["all", "custom"] else (
+                                            "mly_map_feature_point" if self.Type == "marking" else "mly_map_feature_traffic_sign"
+                                        ),
+                                        "traffic_sign" if self.Type not in ["marking"] else "point",
+                                        x, y, z
+                        ): (x, y) for x, y in tile_coords
+                    }
+                    for future in as_completed(future_to_tile):
+                        x, y = future_to_tile[future]
+                        try:
+                            features = future.result()
+                        except Exception as e:
+                            self.logger.error(f"Errore nel fetch del tile x:{x}, y:{y} - {e}")
+                            features = []
+                            
+                        # Applica la logica per selezionare le feature in base a self.Type
+                        if self.Type == "custom":
+                            if configurationFolder == "empty":
+                                raise ValueError("Con la configurazione custom occorre indicare una cartella di configurazione")
+                            self.getCustomConfiguration(configurationFolder)
+                            for f in features:
+                                for elem in self.lines:
+                                    if elem in f['properties']['value']:
                                         output['features'].append(f)
                                         features_count += 1
-
-                            if features_count >= max_features_per_file:
-                                break
+                                        if features_count >= max_features_per_file:
+                                            break
+                        elif self.Type == "all":
+                            output['features'].extend(features)
+                            features_count += len(features)
+                        else:
+                            for f in features:
+                                if self.Type in f['properties']['value']:
+                                    output['features'].append(f)
+                                    features_count += 1
+                                    if features_count >= max_features_per_file:
+                                        break
+                                    
+                        # esci dal loop se abbiamo raggiunto il massimo
                         if features_count >= max_features_per_file:
                             break
-
-                except requests.exceptions.RequestException as e:
-                    self.logger.error(f"Errore durante il download delle tile: {e}")
-                    continue
-
+                        
                 output['features'] = output['features'][:max_features_per_file]
                 cell_filename = f"{output_filename}_row{row}_col{col}.geojson"
                 with open(os.path.join(outputFolder, cell_filename), 'w') as f:

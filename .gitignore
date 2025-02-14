@@ -151,3 +151,4 @@ testing/
 
 src/model/traffic-signs-data/
 src/stats/.*
+.backup
