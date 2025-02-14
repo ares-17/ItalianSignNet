@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 load_dotenv()
 API_KEY = os.getenv("MAPILLARY_API_KEY")
 GEOJSON_ITALY_PATH = os.getenv("GEOJSON_ITALY_PATH")
-GRID_WORKERS = int(os.getenv("DATAMINER_GRID_WORKERS", 10))
+GRID_WORKERS = int(os.getenv("DATAMINER_GRID_WORKERS", 5))
 
 session = requests.Session()
 
