@@ -3,7 +3,8 @@ import utility
 import os
 from dotenv import load_dotenv
 from pathlib import Path
-import time
+import logging
+from datetime import datetime
 import argparse
 
 """
@@ -43,6 +44,19 @@ ur_lat = args.ur_lat
 ur_lon = args.ur_lon
 nome_esecuzione = args.nome_esecuzione
 
+# Configurazione del logger: il file di log avrà come nome il timestamp corrente.
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+log_filename = f"log_{nome_esecuzione}_{timestamp}.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(log_filename),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 
 # Configurazione percorsi di output
 geojsonFolder = os.path.join(cartellaBase, nome_esecuzione, "geojson_folder")
@@ -60,20 +74,13 @@ percorso_configurazione = BASE_DIR / 'src/resources/traffic-signs.txt'
 with open(percorso_configurazione, 'r') as f:
     custom_signals = [line.strip() for line in f]
 
-data = Dataminer()
+data = Dataminer(logger)
 data.chooseConfiguration(Type.CUSTOM)
 
 #Impostazione righe e colonne in cui suddividere l'area
 rows = 6
 cols = 12
 
-def stampa_progresso(regione, start_time):
-    tempo_trascorso = time.time() - start_time
-    print(f"\nInizio elaborazione: {regione['nome']}")
-    print(f"Bounding Box:")
-    print(f"    LAT: {regione['ll_lat']:.6f} → {regione['ur_lat']:.6f}")
-    print(f"    LON: {regione['ll_lon']:.6f} → {regione['ur_lon']:.6f}")
-    print(f"    Tempo trascorso: {tempo_trascorso:.1f}s")
 
 if os.path.exists(percorso_esecuzione):
     if os.path.exists(geojson_file_path) and not os.listdir(outputRitagli):

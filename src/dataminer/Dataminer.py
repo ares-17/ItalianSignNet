@@ -16,43 +16,24 @@ import os
 import utility
 from dotenv import load_dotenv
 from functools import lru_cache
-import logging
-from datetime import datetime
 import functools
 import time
 
-"""
-Modulo per il download e l'elaborazione di dataset geospaziali da Mapillary.
-
-Componenti principali:
-- Definizione di enumerazioni e interfacce per tipi di feature e strategie di download
-- Implementazione di selettori per campionamento dati
-- Classe principale Dataminer per gestione configurazioni, download e elaborazione
-- Funzioni di utilità per conversione coordinate
-"""
-
-# Configurazione del logger: il file di log avrà come nome il timestamp corrente.
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = f"log_{timestamp}.log"
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(log_filename),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
 def log_duration(func):
-    """Decorator che logga la durata di esecuzione della funzione decorata."""
+    """Decorator che logga la durata di esecuzione della funzione decorata.
+       Se il primo argomento (self) possiede l'attributo 'logger', lo utilizza."""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
         duration = end_time - start_time
-        logger.info(f"Operazione {func.__name__} completata in {duration:.2f} secondi")
+        # Se la funzione è un metodo d'istanza e self.logger esiste, lo usa:
+        instance_logger = args[0].logger if args and hasattr(args[0], 'logger') else None
+        if instance_logger:
+            instance_logger.info(f"Operazione {func.__name__} completata in {duration:.2f} secondi")
+        else:
+            print(f"Operazione {func.__name__} completata in {duration:.2f} secondi")
         return result
     return wrapper
 
@@ -66,15 +47,19 @@ session = requests.Session()
 @lru_cache(maxsize=128)
 def fetch_features_cached(type_call: str, tile_layer: str, x: int, y: int, z: int):
     url = f"https://tiles.mapillary.com/maps/vtp/{type_call}/2/{z}/{x}/{y}?access_token={API_KEY}"
-    r = session.get(url)
-    r.raise_for_status()
-    vt_content = r.content
-    try:
-        geojson_data = vt_bytes_to_geojson(vt_content, x, y, z, layer=tile_layer)
-        return geojson_data["features"]
-    except Exception as e:
-        logger.error(f"Errore nel decodificare il vector tile per x:{x}, y:{y}, z:{z} - {e}")
-        return []
+    max_attempts = 3  # numero massimo di tentativi
+    for attempt in range(max_attempts):
+        try:
+            r = session.get(url)
+            r.raise_for_status()
+            vt_content = r.content
+            geojson_data = vt_bytes_to_geojson(vt_content, x, y, z, layer=tile_layer)
+            return geojson_data["features"]
+        except Exception as e:
+            # Non utilizziamo qui il logger globale, poiché il decorator e le istanze dovrebbero gestire il logging.
+            print(f"Errore nel decodificare il vector tile per x:{x}, y:{y}, z:{z} - {e} (tentativo {attempt+1}/{max_attempts})")
+            time.sleep(0.5)
+    return []
 
 # Caching per il recupero della geometria di una immagine (usato in getDistance)
 @lru_cache(maxsize=256)
@@ -147,10 +132,10 @@ class NumberSelector(BaseSelector):
                 try:
                     mapF_id_list = random.sample(mList, obj.selector['number'])
                 except ValueError:
-                    logger.info(f"Il file {geojsonFolder} contiene meno feature del numero richiesto. Seleziono tutte le feature disponibili.")
+                    obj.logger.info(f"Il file {geojsonFolder} contiene meno feature del numero richiesto. Seleziono tutte le feature disponibili.")
                     mapF_id_list = mList
         except (FileNotFoundError, json.JSONDecodeError):
-            logger.error(f"Errore durante l'apertura o la decodifica di {geojsonFolder}.")
+            obj.logger.error(f"Errore durante l'apertura o la decodifica di {geojsonFolder}.")
 
         return mapF_id_list
 
@@ -164,7 +149,8 @@ class Dataminer:
     - Elaborazione immagini e annotazioni
     - Gestione multi-thread
     """
-    def __init__(self):
+    def __init__(self, logger):
+        self.logger = logger
         self.lines = None
         self.Type = Type.ALL.value
         self.polygons = False
@@ -177,27 +163,32 @@ class Dataminer:
     def chooseConfiguration(self, elem):
         """Imposta la configurazione."""
         self.Type = elem.value
+        self.logger.info(f"Configurazione scelta: {self.Type}")
 
     def setPolygon(self, elem):
         """Imposta se utilizzare i poligoni."""
         self.polygons = elem
+        self.logger.info(f"Impostato polygons: {self.polygons}")
 
     def setDistance(self, min=10, max=60):
         """Imposta la distanza minima e massima."""
         self.dist_min = min
         self.dist_max = max
+        self.logger.info(f"Impostata distanza: min={self.dist_min}, max={self.dist_max}")
 
     def setSelector(self, percentage=None, number=None, chunk_dim=None):
         """Imposta i parametri del selettore."""
         self.selector['percentage'] = percentage
         self.selector['number'] = number
         self.selector['chunk_dim'] = chunk_dim
+        self.logger.info(f"Impostato selector: {self.selector}")
 
     def getCustomConfiguration(self, configurationFolder):
         """Ottiene la configurazione personalizzata (caricata una sola volta)."""
         if self.lines is None:
             with open(configurationFolder) as file:
                 self.lines = [line.rstrip('\n') for line in file]
+            self.logger.info(f"Caricata configurazione custom da {configurationFolder}")
 
     def getNGeojson(self, filepath):
         """Ottiene il numero di elementi GeoJSON, gestendo eventuali errori."""
@@ -208,10 +199,10 @@ class Dataminer:
                     count = len(temp.get('features', []))
                     return count
                 except json.JSONDecodeError:
-                    logger.error(f"Errore nel decodificare il file GeoJSON: {filepath}")
+                    self.logger.error(f"Errore nel decodificare il file GeoJSON: {filepath}")
                     return 0
         except FileNotFoundError:
-            logger.error(f"File GeoJSON non trovato: {filepath}")
+            self.logger.error(f"File GeoJSON non trovato: {filepath}")
             return 0
 
     def fetch_features(self, type_call, tile_layer, x, y, z):
@@ -222,21 +213,6 @@ class Dataminer:
     def downloadGeojson(self, ll_lat, ll_lon, ur_lat, ur_lon, z, outputFolder, rows, cols, configurationFolder='empty', output_filename="tsf_data"):
         """
         Scarica dati GeoJSON organizzati in griglia.
-        
-        Parametri:
-        - ll_lat, ll_lon: Lat/lon lower-left bounding box
-        - ur_lat, ur_lon: Lat/lon upper-right bounding box
-        - z: Livello di zoom
-        - outputFolder: Cartella di output
-        - rows, cols: Dimensione griglia
-        - configurationFolder: Path configurazione personalizzata
-        - output_filename: Nome base file output
-        
-        Funzionalità:
-        - Suddivide l'area in celle
-        - Limita features per file (max 150)
-        - Supporta configurazioni custom
-        - Gestisce errori di download
         """
         lat_step = (ur_lat - ll_lat) / rows
         lon_step = (ur_lon - ll_lon) / cols
@@ -290,8 +266,8 @@ class Dataminer:
                             break
 
                 except requests.exceptions.RequestException as e:
-                    logger.error(f"Errore durante il download delle tile: {e}")
-                    continue  # Salta alla cella successiva in caso di errore
+                    self.logger.error(f"Errore durante il download delle tile: {e}")
+                    continue
 
                 output['features'] = output['features'][:max_features_per_file]
                 cell_filename = f"{output_filename}_row{row}_col{col}.geojson"
@@ -302,20 +278,9 @@ class Dataminer:
     def process_data(self, map_feature_id, lock, outputFolderImages, outputFolderAnnotations, custom_signals):
         """
         Elabora una singola feature geospaziale.
-        
-        Operazioni:
-        - Recupero metadati e immagini associate
-        - Calcolo geometrie poligonali
-        - Verifica presenza segnali personalizzati
-        - Download immagine con controllo concorrenza
-        - Generazione file annotazione JSON
-        - Classificazione posizione geografica
         """
         images_id_list = []
-        annotation_data = {
-            "map_feature": {},
-            "image": {}
-        }
+        annotation_data = {"map_feature": {}, "image": {}}
         polygon_geometry = None
 
         header = {'Authorization': f'OAuth {API_KEY}'}
@@ -339,17 +304,17 @@ class Dataminer:
         annotation_data["map_feature"] = data
         map_feature_coordinates = data['geometry']['coordinates']
 
-        # Controllo: verifico se il punto (in formato [lon, lat]) ricavato ricade in Italia.
+        # Verifica se la feature è in Italia
         lon, lat = map_feature_coordinates
         if not utility.is_point_in_italy(lon, lat, GEOJSON_ITALY_PATH):
-            logger.info("La feature non è in Italia. Interruzione dell'elaborazione.")
+            self.logger.info("La feature non è in Italia. Interruzione dell'elaborazione.")
             return
 
         with lock:
             image_id, image_distance = self.getDistance(map_feature_coordinates, images_id_list)
         if image_id is None:
             return
-        logger.info(f"Immagine selezionata: {image_id}, Distanza: {image_distance:.2f}m")
+        self.logger.info(f"Immagine selezionata: {image_id}, Distanza: {image_distance:.2f}m")
 
         url = f"https://graph.mapillary.com/{image_id}?fields=thumb_original_url, geometry"
         response = session.get(url, headers=header)
@@ -358,7 +323,6 @@ class Dataminer:
         image_url = data['thumb_original_url']
         annotation_data["image"] = data
 
-        # Controlla se l'immagine contiene i segnali desiderati
         url = f"https://graph.mapillary.com/{image_id}/detections?fields=value,geometry&access_token={API_KEY}"
         response = session.get(url)
         response.raise_for_status()
@@ -425,14 +389,6 @@ class Dataminer:
 def deg2num(lat_deg, lon_deg, zoom):
     """
     Converte coordinate geografiche a coordinate tile XYZ.
-    
-    Parametri:
-    - lat_deg: Latitudine decimale
-    - lon_deg: Longitudine decimale
-    - zoom: Livello di zoom
-    
-    Restituisce:
-    - (x, y): Coordinate tile
     """
     lat_rad = math.radians(lat_deg)
     n = 2.0 ** zoom

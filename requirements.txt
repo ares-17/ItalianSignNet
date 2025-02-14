@@ -4,10 +4,12 @@ mapbox-vector-tile==1.2.1
 geopy==2.4.1
 vt2geojson==0.2.1
 shapely==2.0.2  # Libreria per operazioni geometriche
+folium==0.19.4
 
 # Computer Vision & ML
 opencv-python-headless==4.9.0.80
 tensorflow==2.16.1
+pandas==2.2.3
 
 # Utilities & Networking
 requests==2.31.0

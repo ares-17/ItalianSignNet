@@ -3,6 +3,7 @@ import subprocess
 from bounding_boxes import BOUNDING_BOXES
 from dotenv import load_dotenv
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import sys
 
 # Carica le variabili d'ambiente
 load_dotenv()
@@ -16,7 +17,7 @@ def process_region(region_key, bbox):
     print(f"Avvio elaborazione per la regione: {region_name}")
 
     args = [
-        "python", DOWNLOAD_BBOX_IMAGES_PATH,
+        sys.executable, DOWNLOAD_BBOX_IMAGES_PATH,
         "--ll_lat", str(bbox["ll_lat"]),
         "--ll_lon", str(bbox["ll_lon"]),
         "--ur_lat", str(bbox["ur_lat"]),
@@ -24,7 +25,7 @@ def process_region(region_key, bbox):
         "--num_features", str(NUM_FEATURES),
         "--nome_esecuzione", region_key
     ]
-    result = subprocess.run(args)
+    result = subprocess.run(args, env=os.environ.copy())
     if result.returncode != 0:
         print(f"Errore nell'elaborazione della regione {region_name}.")
     else:
