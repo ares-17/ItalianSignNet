@@ -58,9 +58,7 @@ def fetch_features_cached(type_call: str, tile_layer: str, x: int, y: int, z: in
             geojson_data = vt_bytes_to_geojson(vt_content, x, y, z, layer=tile_layer)
             return geojson_data["features"]
         except Exception as e:
-            # Non utilizziamo qui il logger globale, poiché il decorator e le istanze dovrebbero gestire il logging.
             print(f"Errore nel decodificare il vector tile per x:{x}, y:{y}, z:{z} - {e} (tentativo {attempt+1}/{max_attempts})")
-            time.sleep(0.5)
     return []
 
 # Caching per il recupero della geometria di una immagine (usato in getDistance)
