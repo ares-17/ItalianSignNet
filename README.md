@@ -1,98 +1,101 @@
-# Datamining e classificazione cartelli stradali italiani
-## Installazione
-Per installare il progetto clonare il repository, creare il file `.env` nella cartella principale del progetto come indicato in `.env.dummy` e configurare le librerie.
+# Datamining e classificazione cartelli stradali italiani tramite geojson
 
-Nota: al momento i file in `src/model/traffic-signs-data` che costituiscono il dataset del modello non sono presenti nel repository poiché eccedono i limiti di spazio che un singolo file può avere secondo le direttive di GitHub. 
- 
-### Configurazione librerie
-Si consiglia di gestire le librerie in ambienti virtuali, come offerto da python venv.
+## Intro
+Il progetto costituisce un esempio di raccolta dei cartelli stradali per un territorio ben delineato e con confini complessi e strutturati come l'Italia. 
+
+Gli script raccolti sono divisi per: raccolta aree geografiche di interesse, utilizzo delle API di Mapillary e raccolta dei cartelli stradali a partire dalle immagini scaricate.
+Le bounding boxes considerate al momento sono:
+
+![Bounding boxes Italiane](public\bounding_boxes_italia_11_02_25.png "Bounding boxes Italiane")
+
+## Caratteristiche del Progetto
+
+- **Multithreading ad Alte Prestazioni**  
+  Il cuore del sistema è l'elaborazione parallela: le bounding boxes vengono processate simultaneamente grazie al multithreading. Questo approccio riduce drasticamente i tempi di attesa delle chiamate API e massimizza l'utilizzo della banda disponibile, consentendo di raccogliere dati su larga scala anche su hardware modesto. I thread sono utilizzati sia sull'esecuzione parallela di più bounding boxes che sull'esecuzione delle numerose API Mapillary coinvolte per ciascuna bounding box
+
+- **Generazione Dinamica delle Bounding Boxes**  
+  Partendo da una macro-area definita (`INITIAL_BBOX`), il sistema suddivide il territorio in celle, escludendo quelle che ricadono fuori dall'Italia grazie all'uso di file geojson dei confini nazionali.
+
+- **Dataset Strutturato e Modulabile**  
+  Il progetto organizza i dati in cartelle specifiche:  
+  - `geojson_folder`: File GeoJSON che definiscono la griglia di raccolta  
+  - `annotations_image`: File JSON contenenti annotazioni dettagliate per ogni immagine  
+  - `resized_images`: Immagini ritagliate dei cartelli stradali  
+  - `signal_catalog`: CSV con informazioni approfondite sui cartelli  
+  - `images`: Immagini originali scaricate  
+  - `annotations.csv`: Mappa tra filename ed etichette
+
+## Installazione
+Scaricare il progetto e configurare le variabili di ambiente nel file `.env` da creare a partire dalla copia di esempio `.env.dummy`. Nel file sono presenti valori di defaults che per un uso basico del progetto possono essere sufficienti. 
+
+Nota: al momento i file in `src/model/traffic-signs-data` che costituiscono il dataset del modello non sono caricati su GitHub per eccedenza dei limiti di spazio.
+
+### Variabili d'ambiente
+Le variabili di ambiente sono utilizzate dai principali script Python e aiutano alla generalizzazione e al basso accoppiamento tra diversi file.
+
+Le variabili di ambiente sono lette da `.env` che deve esser generato a partire da `.env.dummy`. Di seguito una breve introduzione delle variabili:
+
+| Variabile     | Descrizione      |
+| ------------- | ------------- |
+| BASE_DIR | Cartella root del progetto  |
+| MAPILLARY_API_KEY | Personal Token di Mapillary  |
+| GEOJSON_ITALY_PATH | File geojson dei confini. Attualmente l'unico presente è `src/resources/limits_IT_regions.geojson` |
+| DOWNLOAD_BBOX_IMAGES_PATH | Percorso assoluto che indirizza al file `src/dataminer/download_bbox_images.py` |
+| MERGE_FULLSIZE_IMAGES | Booleano utilizzato da `src/utils/merge.py` che se vero implica l'unione delle cartelle dei bounding boxes contenenti le immagini scaricate da Mapillary. Per risparmiare spazio e tempo, lasciare il valore a `False`. Se si intende valorizzarlo con valore positivo, occorre modificare lo script `src/dataminer/download_bbox_images.py` che di default elimina i file non utili alla creazione del dataset |
+| MERGE_BOUNDED_IMAGES | Allo stesso modo della variabile precendete, valorizzarlo solo nei casi in cui siano necessari ulteriori dati, impattando sullo spazio occupato del sistema |
+| INITIAL_BBOX | Coordinate iniziali che delimitano la macro-regione nella quale sono derivate le bounding boxes |
+| BBOXES_TO_REMOVE | Lista di ID delle bounding boxes da escludere. Per il territorio italiano sono escluse tutte quelle che ricadono interamente nel Mar Mediterraneo oppure interamente su territori esteri |
+| LAT_STEP_BBOX | Dimensioni delle bounding boxes |
+| LON_STEP_BBOX | Dimensioni delle bounding boxes |
+| NUM_FEATURES_BBOX | Numero massimo di feature considerate per ogni immagine scaricata da Mapillary |
+| MAX_PARALLEL_EXECUTIONS | Numero di bounding boxes eseguite contemporaneamente. Il valore di default è "4" che non costituisce un parametro valido ed efficiente per ogni architettura hardware |
+| DATAMINER_GRID_WORKERS | Numero di bounding boxes eseguite contemporaneamente. Il valore di default è "8" che sembra essere il massimo numero di chiamate eseguibile con Mpaillary e con la stessa sessione HTTP  |
+
+
+### Librerie
+Nel progetto le dipendenze sono raccolte in `requirements.txt`. Si consiglia di utilizzare un ambiente virtuale Python per gestirle. 
 ```bash
 # Creazione ambiente (da eseguire nella root del progetto)
 python -m venv .venv
-
 # Attivazione (Windows)
 .venv\Scripts\activate
-
 # Attivazione (Linux/macOS)
 source .venv/bin/activate
-
 # Installazione dipendenze
 pip install -r requirements.txt
-
 # Disattivazione
 deactivate
 ```
-Si consiglia caldamente di non committare la cartella associata all'ambiente virtuale.
 
-## Dataminer
-La cartella Dataminer raggruppa gli script del datamining dei cartelli stradali italiani.
+## Struttura
+Nel progetto sono presenti sia script e file per la gestione e download dei cartelli stradali italiani e sia script Python per l'inferenza di un modello VGGNet su tali cartelli. La struttura parametrica del progetto consente anche di personalizzare le aree geografiche e i cartelli da considerare.
+Composizione:
 
-A partire dalle bounding boxes definite in `bounding_boxes.py`, sono eseguiti per ognuna di queste i file `Dataminer` e `utility` per memorizzare i cartelli stradali italiani in base ai parametri in essi scolpiti. 
+- src/dataminer:
+   
+   - **write_bboxes.py**: genera le coordinate delle regioni (bounfing boxes) con le quali suddividere il poligono originale, definito da `INITIAL_BBOX` in `.env`
+   - **bounding_boxes.py**: file autogenerato da `write_bboxes.py` delle regioni geografiche,
+   - **utility.py**: raccolti di funzioni e metodi che semplificano il processo di datamining dei cartelli stradali,
+   - **main.py**: esegue la raccolta dei cartelli stradali avvalendosi di `download_bbox_images.py` e `Dataminer.py`; il parametro `MAX_PARALLEL_EXECUTIONS` indica il numero di regioni esegue parallelamente su tali script,
+   - **download_bbox_images.py**: richiamato da `main.py` con i parametri di una regione geografica, utilizza il `Dataminer.py` per ricavare i dati e scrivere sul disco i file relativi alle immagini raccolte,
+   - **Dataminer.py**: scarica le immagini dei cartelli. I cartelli considerati sono censiti in `utils.py`. Ogni regione geografica di input è suddivisa in una griglia che assicura una raccolta equa e distribuita su ogni cella della regione geografica. Per ogni cartello stradale, si verifica se questo ricade nei confini delimitati dal file `limits_IT_regions.geojson` che contiene i confini delle regioni italiane. La classe Dataminer divede la bounding box in una griglia con celle di ugual dimensione per forzare la raccolta da ciascuna aree geografica. Le API di Mapillary sono richiamate da thread definiti dal parametro `DATAMINER_GRID_WORKERS` che velocizza la raccolta dei dati
 
-Lo script `run_bounding_boxes` è aggiunto per facilitare il processo di datamining eseguendo la memorizzazione dei cartelli per tutte le regioni geografiche definite, una per volta. Al momento, l'unico parametro di configurazione è `NUM_FEATURES` che attesta il numero di feature da considerare per ciascuna esecuzione.
+-  src/resources:
 
-Il file `merge` facilita l'unione delle cartelle generate per ognuna delle regioni geografiche.
+   - **limits_IT_regions.geojson**: raccolta di poligoni geografici che delimitano i confini delle regioni italiane. File scaricato l'11/02/2025 dal repository di (openpolis)[https://github.com/openpolis/geojson-italy],
+   - **traffic-signs.txt**: configurazione utilizzata da `src/dataminer/Dataminer.py`
 
-## Visualizzazione bounding boxes
-Per visualizzare e modifica le bounding boxes considerate nel processo di datamining è fornito lo script `create_bounding_boxes_map.py` che in combinazione con `src\dataminer\bounding_boxes.py` produce in output il file `public\bounding_boxes_italia.html`.
+- src/utils:
 
-Le bounding boxes attualmente in uso sono le seguenti:
-![Bounding Boxes italiane](public/bounding_boxes_italia.png "Bounding Boxes italiane")
+   - **merge.py**: script che unisce i file generati sul disco per ciascuna bounding boxes di `src/dataminer/bounding_boxes.py`. Utile per derivare statistiche e alla base della creazione di un dataset sull'intero territorio indicato. Utile anche a visualizzare i markers dei cartelli stradali, visualizzando il file HTML generato,
+   - **show_bbox_map.py**: genera la mappa HTML delle bounding boxes considerate. Il file è memorizzato in `public/bounding_boxes_italia.html`
 
-Che producono i seguenti markers:
-![Markers considerati](public/markers_italia.png "Markers considerati")
+- src/stats:
 
-## Da concludere: analizer2.py
-### Funzionalità Principali
+   - **analizer2.py**: script che genera grafici statistici sul modello addestrato in `src/model` sul dataset creato dai cartelli stradali considerati,
+   - **count_regions_images.py**: conta i cartelli stradali suddividendoli in tre etichette che corrispondo a tre macroaree della penisola italiana
 
-#### 1. **Analisi Geografica**
-- Distribuzione previsioni corrette/errate (Pie Chart)
-- Probabilità media per area (Bar Chart)
-- Classi con maggiori errori (Stacked Bar Chart)
-
-#### 2. **Analisi per Classe**
-- Probabilità media per classe
-- Classi più problematiche
-- Classi meglio riconosciute
-
-#### 3. **Analisi Feature**
-- Performance per caratteristiche tecniche
-- Classifica feature più affidabili
-
-#### 4. **Analisi Statistica Avanzata**
-- Distribuzione probabilità (Istogrammi)
-- Identificazione outlier (Box Plot)
-- Correlazione risultati-probabilità
-
-### File di Output
-| File | Descrizione |
-|------|-------------|
-| `pie_chart_*.png` | Distribuzione geografica risultati |
-| `probabilita_media.png` | Probabilità media per area |
-| `classi_*` | Analisi errori/corretti per classe |
-| `performance_*` | Report prestazioni per feature |
-| `*_probabilità.png` | Analisi distribuzioni probabilistiche |
-
-### Utilizzo
-1. Configurare `.env` con percorso dataset (`BASE_DIR`)
-2. Posizionare il CSV dei risultati in:  
-   `BASE_DIR/src/model/merged_file.csv`
-3. Eseguire lo script per generare report e grafici
-
-# Vecchio README
-Dataminer: Tool per il mining di dataset
-- test_nord.py: esempio di main, modificare le impostazioni come indicato. E' possibile replicare lo stesso main su più file .py per esecuzione parallela.
-- merge.py: Tool di merge, modificare la cartella di input inserendo la stessa cartella delle esecuzioni all'interno del main
-- utility.py : Contiene tutte le funzioni di ritaglio, creazione mappa e creazione CSV, nonché il mapping tra le classi di GTRSB e i nomi delle label impostate da Mapillary
-
-model: Addestramento modello e classificatore immagini. E' presente anche il dataset GTRSB in formato pickle (traffic-signs-data) e i nomi delle classi presenti (signnames.csv)
-- Classifier.py: contiene il codice per l'addestramento del modello e i metodi per classificare le immagini.
-NB!!! - E' importante che il dataset su cui si voglia fare analisi sia completo, deve esserci il file annotations.csv all'interno del dataset, inserire il percorso del file all'interno del corrente file.
-In saved c'è il modello preaddestrato che utilizza il tool (VGGNet a 12 livelli).
-
-stats: Tool che effettua i vari calcoli e crea i grafici partendo dal csv generato dal tool precedente (quello di output quindi, dopo che è stato effettuato il merge).
-
-Test2: Dataset di segnali stradali italiani
-
-ALTRI FILE
-- traffic-signs.txt : file che contiene la configurazione custom dei segnali stradali. Utilizzando questo file di configurazione (o modificandolo) scarica solo i segnali le cui label sono contenute in questo file. Nella mia configurazione ci sono tutti i segnali appartenenti alle 43 classi del GTRSB
+- src/model:
+   - **Classifier.py**: modello VGGNet
+   - **results**: risultati scritti durante l'esecuzione del modello
+   - **saved**: eventuali parametri salvati del modello
