@@ -46,7 +46,7 @@ nome_esecuzione = args.nome_esecuzione
 
 # Configurazione del logger: il file di log avrà come nome il timestamp corrente.
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = f"log_{nome_esecuzione}_{timestamp}.log"
+log_filename = os.path.join(cartellaBase, nome_esecuzione, f"log_{timestamp}.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
