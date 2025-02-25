@@ -8,6 +8,7 @@ from sklearn.cluster import DBSCAN
 from dotenv import load_dotenv
 import logging
 from datetime import datetime
+from pathlib import Path
 
 """
 Questo script esegue il clustering dei cartelli stradali utilizzando l'algoritmo DBSCAN, tenendo conto delle seguenti considerazioni:
@@ -37,14 +38,17 @@ Questo script esegue il clustering dei cartelli stradali utilizzando l'algoritmo
    nella stessa cartella dello script.
 """
 
-load_dotenv()
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+load_dotenv(os.path.join(script_dir, '.env'))
 DBSCAN_DISTANCE = int(os.getenv("DBSCAN_DISTANCE", 100))
-GEOJSON_FOLDER = "testing/25_02/geojson_folder"
-ANNOTATIONS_CSV = "testing/25_02/annotations.csv"
+GEOJSON_FOLDER = Path(os.getenv("DBSCAN_GEOJSON_FOLDER"))
+ANNOTATIONS_CSV = Path(os.getenv("DBSCAN_ANNOTATIONS_CSV"))
+MIN_SAMPLES = int(os.getenv("DBSCAN_MIN_SAMPLES", 1))
+
 EARTH_RADIUS = 6371000
 EPS_RAD = DBSCAN_DISTANCE / EARTH_RADIUS
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
 timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 log_filename = os.path.join(script_dir, f"dbscan_{timestamp_str}_eps_{DBSCAN_DISTANCE}.log")
 logging.basicConfig(
@@ -55,29 +59,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info("Inizio esecuzione clustering DBSCAN.")
 
+def save_feature_coords(feature, geo_dict):
+    props = feature.get("properties", {})
+    feat_id = str(props.get("id"))
+    coords = feature.get("geometry", {}).get("coordinates", None)
+    if feat_id and coords:
+        geo_dict[feat_id] = coords
+
 # 1. Costruisci un dizionario per mappare l'id della feature a coordinate
 def load_geojson_coordinates(geojson_folder):
     geo_dict = {}
     for filepath in glob.glob(os.path.join(geojson_folder, "*.geojson")):
         with open(filepath, "r") as f:
             data = json.load(f)
-            for feature in data.get("features", []):
-                props = feature.get("properties", {})
-                feat_id = str(props.get("id"))
-                coords = feature.get("geometry", {}).get("coordinates", None)
-                if feat_id and coords:
-                    geo_dict[feat_id] = coords
+            [save_feature_coords(feature, geo_dict) for feature in data.get("features", [])]
+
     logger.info(f"Caricate {len(geo_dict)} coordinate da GeoJSON.")
     return geo_dict
 
-def load_annotations(annotations_csv, geo_dict):
-    df = pd.read_csv(annotations_csv)
-    # Estrae l'ID immagine dal filename e deduplica in base a (id, label)
+def get_unique_imageID_dataframe_from_csv(annotations_csv):
+    df: pd.DataFrame = pd.read_csv(annotations_csv)
     df['image_id'] = df['filename'].apply(lambda x: str(x).split("_")[0])
     df_unique = df.drop_duplicates(subset=["image_id", "feature"])
     
+    return df_unique
+
+def load_annotations(annotations_csv, geo_dict):
+    df = get_unique_imageID_dataframe_from_csv(annotations_csv)
     records = []
-    for _, row in df_unique.iterrows():
+    
+    for _, row in df.iterrows():
         image_id = row["image_id"]
         label = row["feature"]
         coords = geo_dict.get(image_id)
@@ -85,6 +96,7 @@ def load_annotations(annotations_csv, geo_dict):
             lat_rad = radians(coords[1])
             lon_rad = radians(coords[0])
             records.append({"id": image_id, "label": label, "coords": [lat_rad, lon_rad]})
+            
     logger.info(f"Caricati {len(records)} record unici dalle annotazioni.")
     return records
 
@@ -97,6 +109,7 @@ def cluster_by_label(records, eps_rad):
     for label, recs in groups.items():
         coords = np.array([r["coords"] for r in recs])
         image_ids = [r["id"] for r in recs]
+        
         if len(coords) == 0:
             continue
         
@@ -115,6 +128,7 @@ def print_and_report_clusters(clusters_by_label):
         logger.info(f"Etichetta: {label}")
         num_clusters = len(clusters)
         largest_cluster_size = 0
+        
         for cluster_label, img_ids in clusters.items():
             # Se nel cluster ci sono immagini duplicate (lo stesso id), significa che quelle detections provengono dalla stessa immagine.
             # In tal caso, non consideriamo quel cluster per il report.
@@ -124,15 +138,20 @@ def print_and_report_clusters(clusters_by_label):
                 if len(img_ids) > 1:
                     logger.info(f"  Cluster {cluster_label}: {len(img_ids)} immagini -> {img_ids}")
                 largest_cluster_size = max(largest_cluster_size, len(img_ids))
+                
         report[label] = {
             "num_clusters": num_clusters,
             "largest_cluster_size": largest_cluster_size
         }
+        
     logger.info("Report finale:")
+    
     for label, stats in report.items():
         if stats['largest_cluster_size'] > 1:
             logger.info(f"Etichetta: {label} | Numero cluster: {stats['num_clusters']} | Cardinalita del cluster piu grande: {stats['largest_cluster_size']}")
+    
     logger.info("Tutte le etichette non riportate hanno cluster con al piu un elemento")
+    
     return report
 
 def main():
