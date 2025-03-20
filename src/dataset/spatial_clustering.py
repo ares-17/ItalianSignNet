@@ -20,37 +20,40 @@ Questo script esegue il clustering dei cartelli stradali utilizzando l'algoritmo
    Il nome del file è nel formato "${id_immagine_geojson}_${id_detection}.jpg". 
    Da questo viene estratto l'ID immagine (la parte prima dell'underscore).
 
-3. Poiché in una stessa immagine possono essere presenti più rilevamenti (detections) dello stesso cartello, 
-   e tali rilevamenti (cioè le coppie (immagine, etichetta)) non devono essere raggruppati in un cluster 
-   (visto che rappresentano cartelli diversi presenti nella stessa immagine), si esegue una deduplicazione 
-   per considerare **una sola occorrenza per coppia (immagine, etichetta)**.
+3. I record risultanti (composti da ID immagine, etichetta e coordinate convertite in radianti) vengono raggruppati per etichetta.
 
-4. I record risultanti (composti da ID immagine, etichetta e coordinate convertite in radianti) vengono raggruppati per etichetta.
-
-5. Per ciascun gruppo (stessa etichetta) viene applicato DBSCAN con metrica "haversine" e un raggio massimo di 
+4. Per ciascun gruppo (stessa etichetta) viene applicato DBSCAN con metrica "haversine" e un raggio massimo di 
    DBSCAN_DISTANCE (default 100 metri, convertiti in radianti). In questo modo vengono creati cluster di immagini 
    (cioè cartelli rilevati in immagini diverse) che mostrano lo stesso cartello.
 
-6. Alla fine vengono generati report: per ogni etichetta, vengono stampati i cluster (solo quelli composti da più 
-   di un'immagine) e, in report, il numero di cluster per etichetta e la cardinalità del cluster più grande.
+5. Alla fine vengono generati report: per ogni etichetta, vengono stampati i cluster e, in report, il numero di cluster per 
+   etichetta, la cardinalità del cluster più grande e la distribuzione dei cluster in base alla loro dimensione.
+   Inoltre, viene calcolata la distribuzione totale dei cluster (tutte le etichette insieme).
 
-7. Tutte le informazioni di log vengono scritte in un file denominato "dbscan_TIMESTAMP_eps_DBSCAN_DISTANCE.log" 
+6. Tutte le informazioni di log vengono scritte in un file denominato "dbscan_TIMESTAMP_eps_DBSCAN_DISTANCE.log" 
    nella stessa cartella dello script.
+
+7. **Nuova funzionalità:** Le informazioni dei cluster vengono salvate in un file JSON che include:
+    - La mappatura dei cluster per etichetta, con chiavi univoche (concatenazione di label e id DBSCAN)
+    - Un report riepilogativo con il numero di cluster per label, la cardinalità del cluster più grande,
+      la distribuzione per label e la distribuzione totale dei cluster.
 """
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
+logs_dir = os.path.join(script_dir, "logs")
+os.makedirs(logs_dir, exist_ok=True)
 
 load_dotenv(os.path.join(script_dir, '.env'))
 DBSCAN_DISTANCE = int(os.getenv("DBSCAN_DISTANCE", 100))
-GEOJSON_FOLDER = Path(os.getenv("DBSCAN_GEOJSON_FOLDER"))
-ANNOTATIONS_CSV = Path(os.getenv("DBSCAN_ANNOTATIONS_CSV"))
+GEOJSON_FOLDER = Path(os.getenv("GEOJSON_FOLDER"))
+ANNOTATIONS_CSV = Path(os.getenv("ANNOTATIONS_CSV"))
 MIN_SAMPLES = int(os.getenv("DBSCAN_MIN_SAMPLES", 1))
 
 EARTH_RADIUS = 6371000
 EPS_RAD = DBSCAN_DISTANCE / EARTH_RADIUS
 
 timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = os.path.join(script_dir, f"dbscan_{timestamp_str}_eps_{DBSCAN_DISTANCE}.log")
+log_filename = os.path.join(logs_dir, f"dbscan_{timestamp_str}_eps_{DBSCAN_DISTANCE}.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -77,15 +80,14 @@ def load_geojson_coordinates(geojson_folder):
     logger.info(f"Caricate {len(geo_dict)} coordinate da GeoJSON.")
     return geo_dict
 
-def get_unique_imageID_dataframe_from_csv(annotations_csv):
+def get_imageID_dataframe_from_csv(annotations_csv):
     df: pd.DataFrame = pd.read_csv(annotations_csv)
     df['image_id'] = df['filename'].apply(lambda x: str(x).split("_")[0])
-    df_unique = df.drop_duplicates(subset=["image_id", "feature"])
-    
-    return df_unique
+    # NON vengono eliminate le occorrenze duplicate, in modo da mantenere tutti i rilevamenti.
+    return df
 
 def load_annotations(annotations_csv, geo_dict):
-    df = get_unique_imageID_dataframe_from_csv(annotations_csv)
+    df = get_imageID_dataframe_from_csv(annotations_csv)
     records = []
     
     for _, row in df.iterrows():
@@ -97,7 +99,7 @@ def load_annotations(annotations_csv, geo_dict):
             lon_rad = radians(coords[0])
             records.append({"id": image_id, "label": label, "coords": [lat_rad, lon_rad]})
             
-    logger.info(f"Caricati {len(records)} record unici dalle annotazioni.")
+    logger.info(f"Caricati {len(records)} record dalle annotazioni.")
     return records
 
 def cluster_by_label(records, eps_rad):
@@ -116,43 +118,87 @@ def cluster_by_label(records, eps_rad):
         clustering = DBSCAN(eps=eps_rad, min_samples=1, metric="haversine").fit(coords)
         cluster_labels = clustering.labels_
         
+        # Creiamo un dizionario con chiavi univoche: label + "_" + id_cluster
         clusters = {}
         for img_id, cluster_label in zip(image_ids, cluster_labels):
-            clusters.setdefault(cluster_label, []).append(img_id)
+            unique_cluster_id = f"{label}_{cluster_label}"
+            clusters.setdefault(unique_cluster_id, []).append(img_id)
         clusters_by_label[label] = clusters
     return clusters_by_label
 
 def print_and_report_clusters(clusters_by_label):
     report = {}
+    total_distribution = {}  # Distribuzione totale per cardinalità (tutte le etichette)
+    
     for label, clusters in clusters_by_label.items():
         logger.info(f"Etichetta: {label}")
         num_clusters = len(clusters)
         largest_cluster_size = 0
-        
-        for cluster_label, img_ids in clusters.items():
-            # Se nel cluster ci sono immagini duplicate (lo stesso id), significa che quelle detections provengono dalla stessa immagine.
-            # In tal caso, non consideriamo quel cluster per il report.
-            if len(set(img_ids)) < len(img_ids):
-                logger.info(f"  Cluster {cluster_label}: rilevamenti multipli dallo stesso immagine, ignorato per clustering")
-            else:   
-                if len(img_ids) > 1:
-                    logger.info(f"  Cluster {cluster_label}: {len(img_ids)} immagini -> {img_ids}")
-                largest_cluster_size = max(largest_cluster_size, len(img_ids))
-                
+        # Distribuzione per questa etichetta
+        distribution = {}
+        for cluster_key, img_ids in clusters.items():
+            cluster_size = len(img_ids)
+            logger.info(f"  Cluster {cluster_key}: {cluster_size} immagini -> {img_ids}")
+            largest_cluster_size = max(largest_cluster_size, cluster_size)
+            distribution[cluster_size] = distribution.get(cluster_size, 0) + 1
+            
+            # Aggiorna la distribuzione totale
+            total_distribution[cluster_size] = total_distribution.get(cluster_size, 0) + 1
+            
         report[label] = {
             "num_clusters": num_clusters,
-            "largest_cluster_size": largest_cluster_size
+            "largest_cluster_size": largest_cluster_size,
+            "cluster_distribution": distribution
         }
         
+    # Aggiungi la distribuzione totale al report
+    report["total_cluster_distribution"] = total_distribution
+    
     logger.info("Report finale:")
-    
     for label, stats in report.items():
-        if stats['largest_cluster_size'] > 1:
+        if label != "total_cluster_distribution":
             logger.info(f"Etichetta: {label} | Numero cluster: {stats['num_clusters']} | Cardinalita del cluster piu grande: {stats['largest_cluster_size']}")
-    
-    logger.info("Tutte le etichette non riportate hanno cluster con al piu un elemento")
+            logger.info(f"Distribuzione dei cluster: {stats['cluster_distribution']}")
+    logger.info(f"Distribuzione totale dei cluster: {total_distribution}")
     
     return report
+
+def convert_keys(d):
+    """
+    Converte le chiavi di un dizionario in int nativi se sono di tipo numpy.int64.
+    Se il valore è un dizionario, la funzione viene applicata ricorsivamente.
+    """
+    new_d = {}
+    for key, value in d.items():
+        try:
+            new_key = int(key)
+        except (ValueError, TypeError):
+            new_key = key
+        if isinstance(value, dict):
+            new_d[new_key] = convert_keys(value)
+        else:
+            new_d[new_key] = value
+    return new_d
+
+def save_clusters_to_json(clusters_by_label, report, output_path):
+    """
+    Salva le informazioni dei cluster in un file JSON.
+    Il file conterrà sia la mappatura dei cluster per etichetta sia il report riepilogativo.
+    """
+    clusters_by_label_serializable = {
+        label: convert_keys(clusters)
+        for label, clusters in clusters_by_label.items()
+    }
+    
+    data_to_save = {
+        "clusters_by_label": clusters_by_label_serializable,
+        "report": report
+    }
+    
+    with open(output_path, "w") as f:
+        json.dump(data_to_save, f, indent=2)
+    
+    logger.info(f"Informazioni dei cluster salvate in {output_path}")
 
 def main():
     geo_dict = load_geojson_coordinates(GEOJSON_FOLDER)
@@ -163,7 +209,11 @@ def main():
         return
     
     clusters_by_label = cluster_by_label(records, EPS_RAD)
-    print_and_report_clusters(clusters_by_label)
+    report = print_and_report_clusters(clusters_by_label)
+    
+    output_filename = os.path.join(logs_dir, f"dbscan_clusters_{timestamp_str}_eps_{DBSCAN_DISTANCE}.json")
+    save_clusters_to_json(clusters_by_label, report, output_filename)
+    
     logger.info("Esecuzione clustering DBSCAN completata.")
 
 if __name__ == "__main__":

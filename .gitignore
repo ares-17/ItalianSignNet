@@ -149,7 +149,10 @@ cython_debug/
 # For dataminer's file
 testing/
 
+# customs
 src/model/traffic-signs-data/
 src/stats/.*
 .backup
 *.zip
+src/dataset/logs
+src/dataset/reports
