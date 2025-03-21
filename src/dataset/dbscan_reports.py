@@ -12,9 +12,9 @@ reports_dir = os.path.join(script_dir, "reports")
 timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 load_dotenv(os.path.join(script_dir, '.env'))
-GEOJSON_FOLDER = Path(os.getenv("GEOJSON_FOLDER"))
+GEOJSON_FOLDER = os.path.join(Path(os.getenv("TEST_CASE_BASE_ROOT")), "geojson_folder")
 DBSCAN_DISTANCE = int(os.getenv("DBSCAN_DISTANCE", 100))
-italy_bbox = tuple(map(float, os.getenv("ITALY_HEATMAP_BBOX").split(',')))
+ITALY_HEATMAP_BBOX = tuple(map(float, os.getenv("ITALY_HEATMAP_BBOX").split(',')))
 
 def load_geojson_coordinates(geojson_folder):
     """
@@ -53,13 +53,12 @@ def compute_cluster_center(cluster_ids, geo_dict):
     return None
 
 def heatmap(data):
-    geojson_folder = os.path.join(script_dir, GEOJSON_FOLDER)
     clusters_by_label = data.get("clusters_by_label", {})
-    geo_dict = load_geojson_coordinates(geojson_folder)
+    geo_dict = load_geojson_coordinates(GEOJSON_FOLDER)
     
     centers = []
-    for label, clusters in clusters_by_label.items():
-        for cluster_id, image_ids in clusters.items():
+    for _, clusters in clusters_by_label.items():
+        for _, image_ids in clusters.items():
             center = compute_cluster_center(image_ids, geo_dict)
             if center:
                 centers.append(center)
@@ -69,14 +68,14 @@ def heatmap(data):
     if centers.size > 0:
         lats = centers[:,0]
         lons = centers[:,1]
-        hb = plt.hexbin(lons, lats, gridsize=50, extent=(italy_bbox[1], italy_bbox[3], italy_bbox[0], italy_bbox[2]),
+        hb = plt.hexbin(lons, lats, gridsize=50, extent=(ITALY_HEATMAP_BBOX[1], ITALY_HEATMAP_BBOX[3], ITALY_HEATMAP_BBOX[0], ITALY_HEATMAP_BBOX[2]),
                         cmap='YlOrRd', mincnt=1)
         plt.colorbar(hb, label="Numero di cluster")
     plt.title("Heatmap dei cluster sulla mappa dell'Italia")
     plt.xlabel("Longitudine")
     plt.ylabel("Latitudine")
-    plt.plot([italy_bbox[1], italy_bbox[3], italy_bbox[3], italy_bbox[1], italy_bbox[1]],
-             [italy_bbox[0], italy_bbox[0], italy_bbox[2], italy_bbox[2], italy_bbox[0]],
+    plt.plot([ITALY_HEATMAP_BBOX[1], ITALY_HEATMAP_BBOX[3], ITALY_HEATMAP_BBOX[3], ITALY_HEATMAP_BBOX[1], ITALY_HEATMAP_BBOX[1]],
+             [ITALY_HEATMAP_BBOX[0], ITALY_HEATMAP_BBOX[0], ITALY_HEATMAP_BBOX[2], ITALY_HEATMAP_BBOX[2], ITALY_HEATMAP_BBOX[0]],
              color='blue', linewidth=2, label="Bounding Box Italia")
     plt.legend()
     heatmap_file = os.path.join(reports_dir, f"heatmap_clusters_{timestamp_str}_eps_{DBSCAN_DISTANCE}.png")
@@ -119,14 +118,20 @@ def labels_by_bar_graph(report_data):
         plt.savefig(clusters_per_label_file, dpi=300)
         plt.close()
 
+def get_dbscan_file_name():
+    dbscan_file = input("Inserisci il nome del file JSON da leggere dalla cartella logs (es. dbscan_clusters_20250320_193435_eps_100.json): ").strip()
+    if not dbscan_file:
+        print("Errore: devi specificare il nome del file JSON da leggere.")
+        exit(1)
+    
+    logs_dir = os.path.join(script_dir, "logs")
+    return os.path.join(logs_dir, dbscan_file)
+
 def main():
+    json_file = get_dbscan_file_name()
     os.makedirs(reports_dir, exist_ok=True)
 
-    dbscan_file = "dbscan_clusters_20250320_193435_eps_100.json"
-    logs_dir = os.path.join(script_dir, "logs")
-    clusters_file = os.path.join(logs_dir, dbscan_file)
-
-    with open(clusters_file, "r") as f:
+    with open(json_file, "r") as f:
         data = json.load(f)
 
     report_data = data.get("report", {})

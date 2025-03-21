@@ -45,8 +45,8 @@ os.makedirs(logs_dir, exist_ok=True)
 
 load_dotenv(os.path.join(script_dir, '.env'))
 DBSCAN_DISTANCE = int(os.getenv("DBSCAN_DISTANCE", 100))
-GEOJSON_FOLDER = Path(os.getenv("GEOJSON_FOLDER"))
-ANNOTATIONS_CSV = Path(os.getenv("ANNOTATIONS_CSV"))
+GEOJSON_FOLDER = os.path.join(Path(os.getenv("TEST_CASE_BASE_ROOT")), "geojson_folder")
+ANNOTATIONS_CSV_FILE = os.path.join(Path(os.getenv("TEST_CASE_BASE_ROOT")), "annotations.csv")
 MIN_SAMPLES = int(os.getenv("DBSCAN_MIN_SAMPLES", 1))
 
 EARTH_RADIUS = 6371000
@@ -202,7 +202,7 @@ def save_clusters_to_json(clusters_by_label, report, output_path):
 
 def main():
     geo_dict = load_geojson_coordinates(GEOJSON_FOLDER)
-    records = load_annotations(ANNOTATIONS_CSV, geo_dict)
+    records = load_annotations(ANNOTATIONS_CSV_FILE, geo_dict)
     
     if not records:
         logger.error("Nessun record trovato. Verifica che gli ID nelle annotazioni corrispondano ai GeoJSON.")
