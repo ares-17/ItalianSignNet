@@ -146,13 +146,12 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# For dataminer's file
-testing/
-
 # customs
+testing/
 src/model/traffic-signs-data/
 src/stats/.*
 .backup
 *.zip
 src/dataset/logs
 src/dataset/reports
+mlruns

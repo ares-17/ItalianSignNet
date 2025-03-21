@@ -1,0 +1,4 @@
+name: ItalianSignNet
+entry_points:
+  main:
+    command: "python src/model/Classifier.py --param1 {param1}"
