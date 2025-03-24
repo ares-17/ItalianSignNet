@@ -13,15 +13,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 BASE_DIR = os.getenv("BASE_DIR")
-
-# Parametri del modello e training
-MODEL_PATH = 'saved/VGGnet.keras'  # Percorso per salvare/caricare il modello
+ALL_SIGNS_NAME_PATH = os.getenv("ALL_SIGNS_NAME_PATH", "all_signs")
 EPOCHS = 15
 BATCH_SIZE = 64
 
+testing_directory = os.path.join(BASE_DIR, 'testing')
+current_directory = os.path.dirname(os.path.abspath(__file__))
+print(current_directory)
+os.makedirs(os.path.join(current_directory, '.results'), exist_ok=True)
+MODEL_PATH = os.path.join(current_directory, 'saved', 'VGGnet.keras')
+
 # Mapping ClassID to traffic sign names
 signs = []
-with open('../model/results/signnames.csv', 'r') as csvfile:
+with open(os.path.join(BASE_DIR, 'src/utils/signnames.csv'), 'r') as csvfile:
     signnames = csv.reader(csvfile, delimiter=',')
     next(signnames, None)
     for row in signnames:
@@ -48,6 +52,7 @@ def preprocess(data):
     normalized_images = np.array([image_normalize(img) for img in equalized_images])
     return normalized_images[..., np.newaxis]
 
+VGGNet_Model = []
 
 # Carica il modello se esiste, altrimenti addestralo
 if os.path.exists(MODEL_PATH):
@@ -193,7 +198,6 @@ def predict_and_save_to_csv(model, image_folder, json_folder, csv_filename="pred
 
             predictions.append([filename, class_name, class_probability, pred, geo_location])
 
-    # Ordina le predizioni per nome file
     predictions.sort(key=lambda x: x[0])
 
 
@@ -224,6 +228,11 @@ def merge_csv_on_filename(csv1_path, csv2_path, output_path="merged.csv"):
             df2 = df2.rename(columns={filename_col2: "filename"})
 
         merged_df = pd.merge(df1, df2, on="filename", how="outer")
+        
+        if "Predicted Class" not in merged_df.columns or "feature" not in merged_df.columns:
+            raise ValueError("Le colonne 'Predicted Class' e/o 'feature' non sono presenti nel CSV unito.")
+        merged_df["Results"] = merged_df.apply(lambda row: "T" if str(row["Predicted Class"]) == str(row["feature"]) else "F", axis=1)
+        
         merged_df.to_csv(output_path, index=False)
         print(f"File CSV uniti con successo e salvati in {output_path}")
 
@@ -234,21 +243,15 @@ def merge_csv_on_filename(csv1_path, csv2_path, output_path="merged.csv"):
     except ValueError as e:
         print(f"Errore: {e}")
     except Exception as e:
-        print(f"Errore generico durante il merge: {e}")  # Cattura altri potenziali errori
+        print(f"Errore generico durante il merge: {e}")
 
 
+image_folder = os.path.join(testing_directory, ALL_SIGNS_NAME_PATH, 'resized_images')
+json_folder = os.path.join(testing_directory, ALL_SIGNS_NAME_PATH, 'annotations_image')
+predict_and_save_to_csv(VGGNet_Model, image_folder, json_folder, os.path.join(current_directory, '.results', 'predictions.csv'))
 
-image_folder = BASE_DIR / 'Testing/Test2/resized_images'
-json_folder = BASE_DIR / 'Testing/Test2/annotations_image' # Percorso della cartella JSON
-predict_and_save_to_csv(VGGNet_Model, image_folder, json_folder)
-
-#Sostituisci con il percorso del tuo file che contiene le predizioni
-csv1_path = BASE_DIR / 'src/model/results/predictions.csv'  
-
-#Sostituisci con il percorso del file annotations.csv generato del tuo dataset
-csv2_path = BASE_DIR / 'Testing/Test2/annotations.csv'  
-
-
-output_path = "results/merged_file.csv" # Sostituisci con il percorso desiderato per il file di output
+csv1_path = os.path.join(current_directory, '.results', 'predictions.csv') 
+csv2_path = os.path.join(testing_directory, ALL_SIGNS_NAME_PATH, 'annotations.csv') 
+output_path = os.path.join(current_directory, '.results', 'merged_file.csv')
 merge_csv_on_filename(csv1_path, csv2_path, output_path)
 

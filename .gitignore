@@ -150,6 +150,7 @@ cython_debug/
 testing/
 src/model/traffic-signs-data/
 src/stats/.*
+src/model/.*
 .backup
 *.zip
 src/dataset/logs
