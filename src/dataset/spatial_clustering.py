@@ -44,9 +44,10 @@ logs_dir = os.path.join(script_dir, "logs")
 os.makedirs(logs_dir, exist_ok=True)
 
 load_dotenv(os.path.join(script_dir, '.env'))
+BASE_DIR = Path(os.getenv("BASE_DIR"))
 DBSCAN_DISTANCE = int(os.getenv("DBSCAN_DISTANCE", 100))
-GEOJSON_FOLDER = os.path.join(Path(os.getenv("TEST_CASE_BASE_ROOT")), "geojson_folder")
-ANNOTATIONS_CSV_FILE = os.path.join(Path(os.getenv("TEST_CASE_BASE_ROOT")), "annotations.csv")
+GEOJSON_FOLDER = os.path.join(BASE_DIR, Path(os.getenv("TEST_CASE_BASE_ROOT")), "geojson_folder")
+ANNOTATIONS_CSV_FILE = os.path.join(BASE_DIR, Path(os.getenv("TEST_CASE_BASE_ROOT")), "annotations.csv")
 MIN_SAMPLES = int(os.getenv("DBSCAN_MIN_SAMPLES", 1))
 
 EARTH_RADIUS = 6371000
@@ -82,8 +83,7 @@ def load_geojson_coordinates(geojson_folder):
 
 def get_imageID_dataframe_from_csv(annotations_csv):
     df: pd.DataFrame = pd.read_csv(annotations_csv)
-    df['image_id'] = df['filename'].apply(lambda x: str(x).split("_")[0])
-    # NON vengono eliminate le occorrenze duplicate, in modo da mantenere tutti i rilevamenti.
+    df['image_id'] = df['filename'].apply(lambda x: str(x))
     return df
 
 def load_annotations(annotations_csv, geo_dict):
@@ -93,7 +93,7 @@ def load_annotations(annotations_csv, geo_dict):
     for _, row in df.iterrows():
         image_id = row["image_id"]
         label = row["feature"]
-        coords = geo_dict.get(image_id)
+        coords = geo_dict.get(image_id.split("_")[0])
         if coords:
             lat_rad = radians(coords[1])
             lon_rad = radians(coords[0])
@@ -121,9 +121,10 @@ def cluster_by_label(records, eps_rad):
         # Creiamo un dizionario con chiavi univoche: label + "_" + id_cluster
         clusters = {}
         for img_id, cluster_label in zip(image_ids, cluster_labels):
-            unique_cluster_id = f"{label}_{cluster_label}"
+            normalized_label = label.lower().replace(" ", "_")
+            unique_cluster_id = f"{normalized_label}_{cluster_label}"
             clusters.setdefault(unique_cluster_id, []).append(img_id)
-        clusters_by_label[label] = clusters
+        clusters_by_label[normalized_label] = clusters
     return clusters_by_label
 
 def print_and_report_clusters(clusters_by_label):

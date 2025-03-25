@@ -156,3 +156,6 @@ src/model/.*
 src/dataset/logs
 src/dataset/reports
 mlruns
+src/dataset/*/test/
+src/dataset/*/train/
+src/dataset/*/validation/

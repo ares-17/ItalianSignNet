@@ -2,7 +2,6 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-import csv
 import os
 import tensorflow as tf
 from tensorflow.keras.layers import Flatten, Conv2D, MaxPooling2D, Dense, Dropout
@@ -34,8 +33,6 @@ def preprocess(data):
     normalized_images = np.array([image_normalize(img) for img in equalized_images])
     return normalized_images[..., np.newaxis]
 
-VGGNet_Model = []
-
 training_file = "../model/traffic-signs-data/train.p"
 validation_file = "../model/traffic-signs-data/valid.p"
 testing_file = "../model/traffic-signs-data/test.p"
@@ -51,19 +48,10 @@ X_train, y_train = train['features'], train['labels']
 X_valid, y_valid = valid['features'], valid['labels']
 X_test, y_test = test['features'], test['labels']
 
-# Number of training examples
 n_train = X_train.shape[0]
-
-# Number of testing examples
 n_test = X_test.shape[0]
-
-# Number of validation examples.
 n_validation = X_valid.shape[0]
-
-# What's the shape of an traffic sign image?
 image_shape = X_train[0].shape
-
-# How many unique classes/labels there are in the dataset.
 n_classes = len(np.unique(y_train))
 
 print("Number of training examples: ", n_train)
@@ -99,7 +87,7 @@ VGGNet_Model = Sequential([
     Dropout(0.5),
     Dense(128, activation='relu'),
     Dropout(0.5),
-    Dense(n_classes)  # Utilizza n_classes calcolato dai dati
+    Dense(n_classes)
 ])
 
 VGGNet_Model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
