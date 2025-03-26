@@ -54,7 +54,7 @@ EARTH_RADIUS = 6371000
 EPS_RAD = DBSCAN_DISTANCE / EARTH_RADIUS
 
 timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = os.path.join(logs_dir, f"dbscan_{timestamp_str}_eps_{DBSCAN_DISTANCE}.log")
+log_filename = os.path.join(logs_dir, f"spatial_clustering_{timestamp_str}_eps_{DBSCAN_DISTANCE}.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -102,6 +102,10 @@ def load_annotations(annotations_csv, geo_dict):
     logger.info(f"Caricati {len(records)} record dalle annotazioni.")
     return records
 
+def sanitize_param_name(name: str) -> str:
+    """Sostituisce caratteri non validi con underscore"""
+    return name.lower().replace('(', '_').replace(')', '_').replace('/', '_').replace(' ', '_')
+
 def cluster_by_label(records, eps_rad):
     groups = {}
     for rec in records:
@@ -121,7 +125,7 @@ def cluster_by_label(records, eps_rad):
         # Creiamo un dizionario con chiavi univoche: label + "_" + id_cluster
         clusters = {}
         for img_id, cluster_label in zip(image_ids, cluster_labels):
-            normalized_label = label.lower().replace(" ", "_")
+            normalized_label = sanitize_param_name(label)
             unique_cluster_id = f"{normalized_label}_{cluster_label}"
             clusters.setdefault(unique_cluster_id, []).append(img_id)
         clusters_by_label[normalized_label] = clusters
@@ -212,7 +216,7 @@ def main():
     clusters_by_label = cluster_by_label(records, EPS_RAD)
     report = print_and_report_clusters(clusters_by_label)
     
-    output_filename = os.path.join(logs_dir, f"dbscan_clusters_{timestamp_str}_eps_{DBSCAN_DISTANCE}.json")
+    output_filename = os.path.join(logs_dir, f"spatial_clustering_{timestamp_str}_eps_{DBSCAN_DISTANCE}.json")
     save_clusters_to_json(clusters_by_label, report, output_filename)
     
     logger.info("Esecuzione clustering DBSCAN completata.")

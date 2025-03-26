@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 import mlflow
+import mlflow.data
+import mlflow.data.pandas_dataset
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit
 import shutil
@@ -12,7 +14,10 @@ load_dotenv()
 BASE_DIR = os.getenv("BASE_DIR")
 DATA_SOURCE_ROOT = os.path.join(BASE_DIR, os.getenv("TEST_CASE_BASE_ROOT"))
 CLUSTER_JSON_PATH = os.path.join(BASE_DIR, 'src', 'dataset', 'logs', os.getenv("DBSCAN_JSON_CLUSTERS"))
-OUTPUT_DIR = os.path.join(BASE_DIR, 'src', 'dataset', f'dataset_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+OUTPUT_DIR = os.path.join(BASE_DIR, 'src', 'dataset', 'artifacts', f'dataset_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+
+#mlflow.set_tracking_uri(os.path.join('file:/', BASE_DIR, 'mlruns'))
+mlflow.set_tracking_uri('http://localhost:5000')
 
 def assign_cluster_id(metadata: pd.DataFrame, clusters: dict) -> pd.DataFrame:
     """
@@ -50,32 +55,8 @@ def organize_images(row: pd.Series) -> str:
     """
     src_path = os.path.join(DATA_SOURCE_ROOT, "resized_images", row['filename'])
     dest_path = os.path.join(OUTPUT_DIR, row['split'], row['filename'])
-    shutil.copy(src_path, dest_path)
+    #shutil.copy(src_path, dest_path)
     return dest_path
-
-def log_dataset_info(metadata: pd.DataFrame) -> None:
-    """
-    Logga le informazioni del dataset in MLflow.
-
-    Args:
-        metadata: DataFrame contenente i metadati del dataset
-    """
-    with mlflow.start_run():
-        # Log delle distribuzioni
-        mlflow.log_params({
-            'train_clusters': metadata[metadata['split'] == 'train']['cluster_id'].nunique(),
-            'test_clusters': metadata[metadata['split'] == 'test']['cluster_id'].nunique(),
-            'total_clusters': metadata['cluster_id'].nunique()
-        })
-
-        # Log delle statistiche
-        mlflow.log_metrics({
-            'images_per_cluster_mean': metadata.groupby('cluster_id').size().mean(),
-            'images_per_cluster_std': metadata.groupby('cluster_id').size().std()
-        })
-
-        # Log dell'intero dataset come artefatto
-        mlflow.log_artifacts(OUTPUT_DIR, "dataset")
 
 def create_folder_sets() -> None:
     for split in ['train', 'validation', 'test']:
@@ -111,7 +92,7 @@ def split_dataset(metadata: pd.DataFrame) -> pd.DataFrame:
 
     return metadata
 
-def assign_image_local_path(metadata: pd.DataFrame) -> pd.DataFrame:
+def copy_images_to_output_path(metadata: pd.DataFrame) -> pd.DataFrame:
     """
     Assegna il percorso locale alle immagini e le organizza nelle directory.
 
@@ -124,11 +105,73 @@ def assign_image_local_path(metadata: pd.DataFrame) -> pd.DataFrame:
     metadata['image_path'] = metadata.apply(organize_images, axis=1)
     return metadata
 
+def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict) -> None:
+    """
+    Log dataset information to MLflow with enhanced tracking capabilities.
+    
+    Args:
+        metadata: DataFrame containing the dataset metadata
+        cluster_report: Dictionary with cluster statistics
+    """
+    dataset = mlflow.data.from_pandas(
+        metadata,
+        source=DATA_SOURCE_ROOT,
+        name="ItalianTrafficSignDataset",
+        targets="feature"
+    )
+    
+    with mlflow.start_run():
+        mlflow.log_input(dataset, context="full_dataset")
+        
+        for split_name in ['train', 'validation', 'test']:
+            split_df = metadata[metadata['split'] == split_name]
+            if not split_df.empty:
+                split_dataset = mlflow.data.from_pandas(
+                    split_df,
+                    source=dataset.source,
+                    name=f"ItalianTrafficSigns_{split_name}",
+                    targets="feature"
+                )
+                mlflow.log_input(split_dataset, context=f"{split_name}_data")
+                
+                mlflow.log_metric(
+                    f"{split_name}_clusters", 
+                    split_df['cluster_id'].nunique()
+                )
+        
+        clusters_per_split_ratio = float(metadata[metadata['split']=='train']['cluster_id'].nunique() / metadata[metadata['split']=='test']['cluster_id'].nunique())
+        
+        # 3. Log cluster statistics
+        mlflow.log_metrics({
+            'unique_clusters_total': metadata['cluster_id'].nunique(),
+            'clusters_per_split_ratio': clusters_per_split_ratio,
+            'images_per_cluster_mean': metadata.groupby('cluster_id').size().mean()
+        })
+        
+        # 4. Log class distribution (ground truth features)
+        feature_dist = metadata['feature'].value_counts().to_dict()
+        mlflow.log_dict(feature_dist, "feature_distribution.json")
+        
+        # 5. Log cluster report
+        mlflow.log_dict(cluster_report, "cluster_report.json")
+        
+        # 6. Log sample image paths as artifacts
+        sample_images = metadata.head(5)['image_path'].tolist()
+        mlflow.log_text("\n".join(sample_images), "sample_image_paths.txt")
+        
+        # 7. Log important tags
+        mlflow.set_tags({
+            "dataset_type": "image_classification",
+            "cluster_based": "True",
+            "ground_truth_column": "feature",
+            "cluster_column": "cluster_id"
+        })
+
 def main() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
     with open(CLUSTER_JSON_PATH) as f:
-        clustersInfo = json.load(f)
+        clustersInfo: dict = json.load(f)
     
     create_folder_sets()
 
@@ -136,10 +179,10 @@ def main() -> None:
     metadata: pd.DataFrame = pd.read_csv(os.path.join(DATA_SOURCE_ROOT, "annotations.csv"))
     metadata = assign_cluster_id(metadata, clusters)
     metadata = split_dataset(metadata)
-    metadata = assign_image_local_path(metadata)
+    metadata = copy_images_to_output_path(metadata)
 
     save_to_parquet(metadata)
-    log_dataset_info(metadata)
+    log_dataset_info(metadata, clustersInfo['report'])
 
 if __name__ == "__main__":
     main()
