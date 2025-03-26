@@ -159,3 +159,4 @@ mlruns
 src/dataset/*/test/
 src/dataset/*/train/
 src/dataset/*/validation/
+src/dataset/*/dataset_*
