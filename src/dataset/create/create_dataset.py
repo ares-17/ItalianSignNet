@@ -10,22 +10,9 @@ from datetime import datetime
 
 load_dotenv()
 BASE_DIR = os.getenv("BASE_DIR")
-DBSCAN_JSON_CLUSTERS = os.getenv("DBSCAN_JSON_CLUSTERS")
 DATA_SOURCE_ROOT = os.path.join(BASE_DIR, os.getenv("TEST_CASE_BASE_ROOT"))
-CLUSTER_JSON_PATH = os.path.join(BASE_DIR, 'src', 'dataset','logs', DBSCAN_JSON_CLUSTERS)
+CLUSTER_JSON_PATH = os.path.join(BASE_DIR, 'src', 'dataset','logs', os.getenv("DBSCAN_JSON_CLUSTERS"))
 OUTPUT_DIR = os.path.join(BASE_DIR, 'src', 'dataset', f'dataset_${datetime.now().strftime("%Y%m%d_%H%M%S")}')
-
-SEED = int(os.getenv("SEED_GROUP_SHUFFLE_DATASET", 42))
-TEST_SIZE = float(os.getenv("TEST_SIZE_DATASET", 0.2))
-VAL_SIZE = float(os.getenv("VAL_SIZE_DATASET", 0.1))
-
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-with open(CLUSTER_JSON_PATH) as f:
-    clustersInfo = json.load(f)
-
-clusters: dict = clustersInfo['clusters_by_label']
-metadata = pd.read_csv(f"{DATA_SOURCE_ROOT}/annotations.csv")
 
 def assign_cluster_id(metadata, clusters):
     cluster_id_map = {}
@@ -37,26 +24,8 @@ def assign_cluster_id(metadata, clusters):
     metadata['cluster_id'] = metadata['filename'].map(cluster_id_map)
     return metadata
 
-def save_to_parquet():
+def save_to_parquet(metadata: pd.DataFrame):
     metadata.to_parquet(f"{OUTPUT_DIR}/metadata.parquet")
-
-metadata = assign_cluster_id(metadata, clusters)
-
-# Split stratified mantenendo i cluster intatti
-splitter = GroupShuffleSplit(n_splits=1, test_size=TEST_SIZE + VAL_SIZE, random_state=SEED)
-train_idx, temp_idx = next(splitter.split(metadata, groups=metadata['cluster_id']))
-
-# Split ulteriore per validation/test
-splitter_val_test = GroupShuffleSplit(n_splits=1, test_size=VAL_SIZE/(TEST_SIZE + VAL_SIZE), random_state=SEED)
-val_idx, test_idx = next(splitter_val_test.split(metadata.iloc[temp_idx], groups=metadata.iloc[temp_idx]['cluster_id']))
-
-# Assegnazione degli split
-metadata['split'] = 'train'
-metadata.iloc[temp_idx[val_idx], metadata.columns.get_loc('split')] = 'validation'
-metadata.iloc[temp_idx[test_idx], metadata.columns.get_loc('split')] = 'test'
-
-for split in ['train', 'validation', 'test']:
-    (Path(OUTPUT_DIR) / split).mkdir(parents=True, exist_ok=True)
 
 def organize_images(row):
     src_path = f"{DATA_SOURCE_ROOT}/resized_images/{row['filename']}"
@@ -64,15 +33,7 @@ def organize_images(row):
     shutil.copy(src_path, dest_path)
     return dest_path
 
-metadata['image_path'] = metadata.apply(organize_images, axis=1)
-
-# Opzionale: Crea un file di esempio per il README
-sample = metadata.sample(3)[['filename', 'label', 'bbox_coordinates']]
-sample.to_markdown(f"{OUTPUT_DIR}/sample.md", index=False)
-
-save_to_parquet()
-
-def log_dataset_info():
+def log_dataset_info(metadata: pd.DataFrame):
     with mlflow.start_run():
         # Log delle distribuzioni
         mlflow.log_params({
@@ -89,5 +50,50 @@ def log_dataset_info():
         
         # Log dell'intero dataset come artefatto
         mlflow.log_artifacts(OUTPUT_DIR, "dataset")
+    
+def create_folder_sets():
+    for split in ['train', 'validation', 'test']:
+        (Path(OUTPUT_DIR) / split).mkdir(parents=True, exist_ok=True)
+
+def split_dataset(metadata: pd.DataFrame):
+    seed = int(os.getenv("SEED_GROUP_SHUFFLE_DATASET", 42))
+    test_size = float(os.getenv("TEST_SIZE_DATASET", 0.2))
+    val_size = float(os.getenv("VAL_SIZE_DATASET", 0.1))
+    
+    # Split stratified mantenendo i cluster intatti
+    splitter = GroupShuffleSplit(n_splits=1, test_size=test_size + val_size, random_state=seed)
+    _, temp_idx = next(splitter.split(metadata, groups=metadata['cluster_id']))
+
+    # Split ulteriore per validation/test
+    splitter_val_test = GroupShuffleSplit(n_splits=1, test_size=val_size/(test_size + val_size), random_state=seed)
+    val_idx, test_idx = next(splitter_val_test.split(metadata.iloc[temp_idx], groups=metadata.iloc[temp_idx]['cluster_id']))
+
+    # Assegnazione degli split
+    metadata['split'] = 'train'
+    metadata.iloc[temp_idx[val_idx], metadata.columns.get_loc('split')] = 'validation'
+    metadata.iloc[temp_idx[test_idx], metadata.columns.get_loc('split')] = 'test'
+    
+    return metadata
+    
+def assign_image_local_path(metadata: pd.DataFrame):
+    metadata['image_path'] = metadata.apply(organize_images, axis=1)
+    return metadata
+    
+def main():
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    with open(CLUSTER_JSON_PATH) as f:
+        clustersInfo = json.load(f)
         
-log_dataset_info()
+    create_folder_sets()
+
+    clusters: dict = clustersInfo['clusters_by_label']
+    metadata: pd.DataFrame = pd.read_csv(f"{DATA_SOURCE_ROOT}/annotations.csv")
+    metadata = assign_cluster_id(metadata, clusters)
+    metadata = split_dataset(metadata)
+    metadata = assign_image_local_path(metadata)
+
+    save_to_parquet(metadata)
+    log_dataset_info(metadata)
+    
+if __name__ == "__main__":
+    main()
