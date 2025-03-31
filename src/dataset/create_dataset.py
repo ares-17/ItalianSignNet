@@ -14,9 +14,9 @@ load_dotenv()
 BASE_DIR = os.getenv("BASE_DIR")
 DATA_SOURCE_ROOT = os.path.join(BASE_DIR, os.getenv("TEST_CASE_BASE_ROOT"))
 CLUSTER_JSON_PATH = os.path.join(BASE_DIR, 'src', 'dataset', 'logs', os.getenv("DBSCAN_JSON_CLUSTERS"))
-OUTPUT_DIR = os.path.join(BASE_DIR, 'src', 'dataset', 'artifacts', f'dataset_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+DBSCAN_DISTANCE = int(os.getenv("DBSCAN_DISTANCE", 100))
+OUTPUT_DIR = os.path.join(BASE_DIR, 'src', 'dataset', 'artifacts', f'dataset_{datetime.now().strftime("%Y%m%d_%H%M%S")}_eps_${DBSCAN_DISTANCE}')
 
-#mlflow.set_tracking_uri(os.path.join('file:/', BASE_DIR, 'mlruns'))
 mlflow.set_tracking_uri('http://localhost:5000')
 
 def assign_cluster_id(metadata: pd.DataFrame, clusters: dict) -> pd.DataFrame:
@@ -55,7 +55,7 @@ def organize_images(row: pd.Series) -> str:
     """
     src_path = os.path.join(DATA_SOURCE_ROOT, "resized_images", row['filename'])
     dest_path = os.path.join(OUTPUT_DIR, row['split'], row['filename'])
-    #shutil.copy(src_path, dest_path)
+    shutil.copy(src_path, dest_path)
     return dest_path
 
 def create_folder_sets() -> None:
@@ -94,7 +94,7 @@ def split_dataset(metadata: pd.DataFrame) -> pd.DataFrame:
 
 def copy_images_to_output_path(metadata: pd.DataFrame) -> pd.DataFrame:
     """
-    Assegna il percorso locale alle immagini e le organizza nelle directory.
+    Organizza i samples nelle directory.
 
     Args:
         metadata: DataFrame contenente i metadati
@@ -102,7 +102,7 @@ def copy_images_to_output_path(metadata: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame con la colonna aggiuntiva 'image_path'
     """
-    metadata['image_path'] = metadata.apply(organize_images, axis=1)
+    metadata.apply(organize_images, axis=1)
     return metadata
 
 def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict) -> None:
@@ -110,62 +110,58 @@ def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict) -> None:
     Log dataset information to MLflow with enhanced tracking capabilities.
     
     Args:
-        metadata: DataFrame containing the dataset metadata
-        cluster_report: Dictionary with cluster statistics
+        metadata: DataFrame contenente le informazioni sul dataset.
+        cluster_report: Dizionario con statistiche relative ai cluster.
     """
+    # Crea un dataset a partire dal DataFrame
     dataset = mlflow.data.from_pandas(
         metadata,
         source=DATA_SOURCE_ROOT,
-        name="ItalianTrafficSignDataset",
+        name=f"ItalianTrafficSignDataset_${DBSCAN_DISTANCE}",
         targets="feature"
     )
-    
-    with mlflow.start_run():
-        mlflow.log_input(dataset, context="full_dataset")
-        
-        for split_name in ['train', 'validation', 'test']:
-            split_df = metadata[metadata['split'] == split_name]
-            if not split_df.empty:
-                split_dataset = mlflow.data.from_pandas(
-                    split_df,
-                    source=dataset.source,
-                    name=f"ItalianTrafficSigns_{split_name}",
-                    targets="feature"
-                )
-                mlflow.log_input(split_dataset, context=f"{split_name}_data")
-                
-                mlflow.log_metric(
-                    f"{split_name}_clusters", 
-                    split_df['cluster_id'].nunique()
-                )
-        
-        clusters_per_split_ratio = float(metadata[metadata['split']=='train']['cluster_id'].nunique() / metadata[metadata['split']=='test']['cluster_id'].nunique())
-        
-        # 3. Log cluster statistics
-        mlflow.log_metrics({
-            'unique_clusters_total': metadata['cluster_id'].nunique(),
-            'clusters_per_split_ratio': clusters_per_split_ratio,
-            'images_per_cluster_mean': metadata.groupby('cluster_id').size().mean()
-        })
-        
-        # 4. Log class distribution (ground truth features)
-        feature_dist = metadata['feature'].value_counts().to_dict()
-        mlflow.log_dict(feature_dist, "feature_distribution.json")
-        
-        # 5. Log cluster report
-        mlflow.log_dict(cluster_report, "cluster_report.json")
-        
-        # 6. Log sample image paths as artifacts
-        sample_images = metadata.head(5)['image_path'].tolist()
-        mlflow.log_text("\n".join(sample_images), "sample_image_paths.txt")
-        
-        # 7. Log important tags
-        mlflow.set_tags({
-            "dataset_type": "image_classification",
-            "cluster_based": "True",
-            "ground_truth_column": "feature",
-            "cluster_column": "cluster_id"
-        })
+
+    with mlflow.start_run(run_name="full_experiment"):
+        with mlflow.start_run(run_name="dataset_creation", nested=True):
+            mlflow.log_input(dataset, context="full_dataset")
+
+            for split_name in ['train', 'validation', 'test']:
+                split_df = metadata[metadata['split'] == split_name]
+                if not split_df.empty:
+                    split_dataset = mlflow.data.from_pandas(
+                        split_df,
+                        source=dataset.source,
+                        name=f"ItalianTrafficSigns_{split_name}",
+                        targets="feature"
+                    )
+                    mlflow.log_input(split_dataset, context=f"{split_name}_data")
+                    
+                    mlflow.log_metric(
+                        f"{split_name}_clusters", 
+                        split_df['cluster_id'].nunique()
+                    )
+
+            # Log metriche e statistiche globali del dataset
+            mlflow.log_metrics({
+                'unique_clusters_total': metadata['cluster_id'].nunique(),
+                'images_per_cluster_mean': metadata.groupby('cluster_id').size().mean()
+            })
+
+            # Log distribuzione delle feature (classi) e report sui cluster
+            feature_dist = metadata['feature'].value_counts().to_dict()
+            mlflow.log_dict(feature_dist, "feature_distribution.json")
+            mlflow.log_dict(cluster_report, "cluster_report.json")
+
+            # Imposta dei tag importanti per il dataset
+            mlflow.set_tags({
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "version": 0.1,
+                "eps": DBSCAN_DISTANCE,
+                "folder": os.getenv("TEST_CASE_BASE_ROOT"),
+                "json_spatial_clustering": CLUSTER_JSON_PATH
+            })
+
+            mlflow.log_artifact(CLUSTER_JSON_PATH)
 
 def main() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
