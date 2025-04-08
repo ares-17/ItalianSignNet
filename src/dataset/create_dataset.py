@@ -5,7 +5,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 import mlflow
 import mlflow.data
-import mlflow.data.pandas_dataset
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit
 import shutil
@@ -17,7 +16,8 @@ BASE_DIR = os.getenv("BASE_DIR")
 DATA_SOURCE_ROOT = os.path.join(BASE_DIR, os.getenv("TEST_CASE_BASE_ROOT"))
 CLUSTER_JSON_PATH = os.path.join(BASE_DIR, 'src', 'dataset', 'logs', os.getenv("DBSCAN_JSON_CLUSTERS"))
 DBSCAN_DISTANCE = int(os.getenv("DBSCAN_DISTANCE", 100))
-OUTPUT_DIR = os.path.join(BASE_DIR, 'src', 'dataset', 'artifacts', f'dataset_{TIMESTAMP}_eps_${DBSCAN_DISTANCE}')
+OUTPUT_DIR = os.path.join(BASE_DIR, 'src', 'dataset', 'artifacts', f'dataset_{TIMESTAMP}_eps_{DBSCAN_DISTANCE}')
+LABEL_INDEX_FILE = os.path.join(BASE_DIR, 'src', 'utils', 'signnames.csv')
 
 mlflow.set_tracking_uri('http://localhost:5000')
 
@@ -45,6 +45,10 @@ def save_to_parquet(metadata: pd.DataFrame) -> None:
     output_path = os.path.join(OUTPUT_DIR, "metadata.parquet")
     metadata.to_parquet(output_path)
 
+def sanitize_param_name(name: str) -> str:
+    """Sostituisce caratteri non validi con underscore"""
+    return name.lower().replace('(', '_').replace(')', '_').replace('/', '_').replace(' ', '_')
+
 def organize_images(row: pd.Series) -> str:
     """
     Organizza le immagini nelle directory corrispondenti allo split assegnato.
@@ -56,7 +60,9 @@ def organize_images(row: pd.Series) -> str:
         Percorso di destinazione dell'immagine copiata
     """
     src_path = os.path.join(DATA_SOURCE_ROOT, "resized_images", row['filename'])
-    dest_path = os.path.join(OUTPUT_DIR, row['split'], row['filename'])
+    dest_path = os.path.join(OUTPUT_DIR, row['split'], str(row['feature_index']))
+    Path(dest_path).mkdir(parents=True, exist_ok=True)
+    
     shutil.copy(src_path, dest_path)
     return dest_path
 
@@ -106,6 +112,34 @@ def copy_images_to_output_path(metadata: pd.DataFrame) -> pd.DataFrame:
     """
     metadata.apply(organize_images, axis=1)
     return metadata
+
+def add_coordinates_to_dataframe(df: pd.DataFrame, coordinates):
+    """Aggiunge una colonna 'coordinates' al DataFrame con le coordinate formattate come stringa."""
+    df['coordinates'] = df['filename'].apply(
+        lambda img_id: f"{coordinates[img_id]['coords'][0]},{coordinates[img_id]['coords'][1]}"
+    )
+    return df
+
+def df_add_label_index_column(metadata: pd.DataFrame) -> pd.DataFrame:
+    pd_indexes = pd.read_csv(LABEL_INDEX_FILE)
+
+    pd_indexes["SignName_lower"] = pd_indexes["SignName"].str.lower()
+    metadata["feature_lower"] = metadata["feature"].str.lower()
+
+    label_map = dict(zip(pd_indexes["SignName_lower"], pd_indexes["ClassId"]))
+
+    metadata["feature_index"] = metadata["feature_lower"].map(label_map)
+    # Drop temporary column
+    metadata.drop(columns=["feature_lower"], inplace=True)
+
+    if metadata["feature_index"].isnull().any():
+        unmapped = metadata[metadata["feature_index"].isnull()]["feature"].unique()
+        raise ValueError(f"Le seguenti feature non sono state trovate nel file label index (case-insensitive): {unmapped}")
+
+    metadata["feature_index"] = metadata["feature_index"].astype(int)
+
+    return metadata
+
 
 def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict) -> None:
     """
@@ -174,6 +208,8 @@ def main() -> None:
 
     clusters: dict = clustersInfo['clusters_by_label']
     metadata: pd.DataFrame = pd.read_csv(os.path.join(DATA_SOURCE_ROOT, "annotations.csv"))
+    metadata = df_add_label_index_column(metadata)
+    metadata = add_coordinates_to_dataframe(metadata, clustersInfo['coordinates'])
     metadata = assign_cluster_id(metadata, clusters)
     metadata = split_dataset(metadata)
     metadata = copy_images_to_output_path(metadata)

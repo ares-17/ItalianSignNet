@@ -149,6 +149,7 @@ cython_debug/
 # customs
 testing/
 src/model/traffic-signs-data/
+src/model/saved
 src/stats/.*
 src/model/.*
 .backup

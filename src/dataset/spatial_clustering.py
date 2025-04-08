@@ -86,7 +86,7 @@ def get_imageID_dataframe_from_csv(annotations_csv):
     df['image_id'] = df['filename'].apply(lambda x: str(x))
     return df
 
-def load_annotations(annotations_csv, geo_dict):
+def load_annotations(annotations_csv, geo_dict) -> list:
     df = get_imageID_dataframe_from_csv(annotations_csv)
     records = []
     
@@ -97,7 +97,7 @@ def load_annotations(annotations_csv, geo_dict):
         if coords:
             lat_rad = radians(coords[1])
             lon_rad = radians(coords[0])
-            records.append({"id": image_id, "label": label, "coords": [lat_rad, lon_rad]})
+            records.append({"id": image_id, "label": label, "coords": [lat_rad, lon_rad], "raw_coords": [coords[1], coords[0]]})
             
     logger.info(f"Caricati {len(records)} record dalle annotazioni.")
     return records
@@ -130,6 +130,10 @@ def cluster_by_label(records, eps_rad):
             clusters.setdefault(unique_cluster_id, []).append(img_id)
         clusters_by_label[normalized_label] = clusters
     return clusters_by_label
+
+def aggregate_all_records_coords(records):
+    """Aggrega record in un dizionario con chiavi ID e coordinate."""
+    return {rec['id']: {'id': rec['id'], 'radius_coords': rec['coords'], 'coords': rec['raw_coords']} for rec in records}
 
 def print_and_report_clusters(clusters_by_label):
     report = {}
@@ -185,7 +189,7 @@ def convert_keys(d):
             new_d[new_key] = value
     return new_d
 
-def save_clusters_to_json(clusters_by_label, report, output_path):
+def save_clusters_to_json(clusters_by_label, report, coordinates_dict, output_path):
     """
     Salva le informazioni dei cluster in un file JSON.
     Il file conterrà sia la mappatura dei cluster per etichetta sia il report riepilogativo.
@@ -197,6 +201,7 @@ def save_clusters_to_json(clusters_by_label, report, output_path):
     
     data_to_save = {
         "clusters_by_label": clusters_by_label_serializable,
+        "coordinates": coordinates_dict,
         "report": report
     }
     
@@ -214,10 +219,11 @@ def main():
         return
     
     clusters_by_label = cluster_by_label(records, EPS_RAD)
+    coordinates_dict = aggregate_all_records_coords(records)
     report = print_and_report_clusters(clusters_by_label)
     
     output_filename = os.path.join(logs_dir, f"spatial_clustering_{timestamp_str}_eps_{DBSCAN_DISTANCE}.json")
-    save_clusters_to_json(clusters_by_label, report, output_filename)
+    save_clusters_to_json(clusters_by_label, report, coordinates_dict, output_filename)
     
     logger.info("Esecuzione clustering DBSCAN completata.")
 

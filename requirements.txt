@@ -13,10 +13,16 @@ pandas==2.2.3
 
 # Utilities & Networking
 requests==2.31.0
-protobuf==3.20.3  # Necessario per prevenire conflitti con TensorFlow
+protobuf==3.20.3
 
 # Environment Variables
 python-dotenv==1.0.0
 
 # MLOps
 mlflow==2.21.0
+
+# Load pre-trained models
+transformers==4.50.3
+
+# Hugging face's library for load local dataset
+datasets==2.19.1
