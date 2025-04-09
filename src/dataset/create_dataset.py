@@ -157,7 +157,7 @@ def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict) -> None:
         targets="feature"
     )
 
-    with mlflow.start_run(run_name=f"dataset_creation_{TIMESTAMP}", nested=True):
+    with mlflow.start_run(run_name=f"dataset_creation_{TIMESTAMP}"):
         mlflow.log_input(dataset, context="full_dataset")
 
         for split_name in ['train', 'validation', 'test']:
