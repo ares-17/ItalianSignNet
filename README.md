@@ -1,4 +1,4 @@
-# Datamining e classificazione cartelli stradali italiani tramite geojson
+# Datamining e classificazione cartelli stradali italiani
 
 ## Intro
 Il progetto costituisce un esempio di raccolta dei cartelli stradali per un territorio ben delineato e con confini complessi e strutturati come l'Italia. 
