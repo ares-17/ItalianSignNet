@@ -6,7 +6,7 @@ Il progetto costituisce un esempio di raccolta dei cartelli stradali per un terr
 Gli script raccolti sono divisi per: raccolta aree geografiche di interesse, utilizzo delle API di Mapillary e raccolta dei cartelli stradali a partire dalle immagini scaricate.
 Le bounding boxes considerate al momento sono:
 
-![Bounding boxes Italiane](public\bounding_boxes_italia_11_02_25.png "Bounding boxes Italiane")
+![Bounding boxes Italiane](public/bounding_boxes_italia_11_02_25.png "Bounding boxes Italiane")
 
 ## Caratteristiche del Progetto
 
