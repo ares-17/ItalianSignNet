@@ -215,6 +215,13 @@ def load_dataset_with_features(data_dir: str, metadata_path: str) -> DatasetDict
     
     return {"test": test_dataset}
 
+def log_processor_info(processor):
+    LOGGER.info("Model normalization specifications:")
+    LOGGER.info(f"Normalization: {processor.do_normalize}")
+    LOGGER.info(f"Mean values: {processor.image_mean}")
+    LOGGER.info(f"Standard deviation values: {processor.image_std}")
+    LOGGER.info(f"Image size: {processor.size}")
+
 def main() -> None:    
     load_dotenv()
     datasets_folder, folder_name = get_latest_dataset_folder()
@@ -224,18 +231,13 @@ def main() -> None:
         data_dir=datasets_folder,
         metadata_path=metadata_path
     )
-    
     processor = AutoImageProcessor.from_pretrained(REPO_MODEL)
+    
+    log_processor_info(processor)
+    log_dataset_test_structure(dataset)
+    
     model: PreTrainedModel = AutoModelForImageClassification.from_pretrained(REPO_MODEL)
     model.eval()
-    
-    LOGGER.info("Model normalization specifications:")
-    LOGGER.info(f"Normalization: {processor.do_normalize}")
-    LOGGER.info(f"Mean values: {processor.image_mean}")
-    LOGGER.info(f"Standard deviation values: {processor.image_std}")
-    LOGGER.info(f"Image size: {processor.size}")
-    
-    log_dataset_test_structure(dataset)
     
     dataset["test"] = dataset["test"].map(lambda x: preprocess(processor, x), batched=True, remove_columns=["image"])
     test_dataloader = DataLoader(dataset["test"], batch_size=4, collate_fn=collate_fn)
