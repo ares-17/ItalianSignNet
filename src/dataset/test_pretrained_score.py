@@ -33,21 +33,20 @@ from datasets import DatasetDict, load_dataset, ClassLabel
 from typing import Dict, Any
 import numpy as np
 import logging
-import datetime
+from datetime import datetime
 
 REPO_MODEL: str = "bazyl/gtsrb-model"
+TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # use or create log's dir
-logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-os.makedirs(logs_dir, exist_ok=True)
+LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+os.makedirs(LOGS_DIR, exist_ok=True)
 
 # logger definition
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler(
-        os.path.join(logs_dir, f"test_pretrained_{datetime.now().strftime("%Y%m%d_%H%M%S")}_eps_{REPO_MODEL.replace('/', '_')}.log")
-    )]
+    handlers=[logging.FileHandler(os.path.join(LOGS_DIR, f"test_pretrained_{TIMESTAMP}_model_{REPO_MODEL.replace('/', '_')}.log"))]
 )
 LOGGER = logging.getLogger(__name__)
 
