@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import mlflow
 import mlflow.data
 import pandas as pd
-from sklearn.model_selection import GroupShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit
 import shutil
 
 TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -14,12 +14,27 @@ TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 load_dotenv()
 BASE_DIR = os.getenv("BASE_DIR")
 DATA_SOURCE_ROOT = os.path.join(BASE_DIR, os.getenv("TEST_CASE_BASE_ROOT"))
-CLUSTER_JSON_PATH = os.path.join(BASE_DIR, 'src', 'dataset', 'logs', os.getenv("DBSCAN_JSON_CLUSTERS"))
 DBSCAN_DISTANCE = int(os.getenv("DBSCAN_DISTANCE", 100))
 OUTPUT_DIR = os.path.join(BASE_DIR, 'src', 'dataset', 'artifacts', f'dataset_{TIMESTAMP}_eps_{DBSCAN_DISTANCE}')
 LABEL_INDEX_FILE = os.path.join(BASE_DIR, 'src', 'utils', 'signnames.csv')
 
 mlflow.set_tracking_uri('http://localhost:5000')
+
+def get_latest_json() -> str:
+    logs_dir = os.path.join(BASE_DIR, 'src', 'dataset', 'logs')
+    json_files = [
+        f for f in os.listdir(logs_dir)
+        if f.endswith('.json') and os.path.isfile(os.path.join(logs_dir, f))
+    ]
+    
+    if not json_files:
+        raise ValueError(f"Nessun file JSON trovato nella cartella {logs_dir}")
+    
+    latest_json = sorted(json_files)[-1]
+    json_path = os.path.join(logs_dir, latest_json)
+    return json_path
+
+CLUSTER_JSON_PATH = get_latest_json()
 
 def assign_cluster_id(metadata: pd.DataFrame, clusters: dict) -> pd.DataFrame:
     """
@@ -49,19 +64,22 @@ def sanitize_param_name(name: str) -> str:
     """Sostituisce caratteri non validi con underscore"""
     return name.lower().replace('(', '_').replace(')', '_').replace('/', '_').replace(' ', '_')
 
+def precreate_class_folders(split: str, base_dir: str) -> None:
+    """
+    Crea preventivamente tutte le cartelle delle classi per ogni split.
+    """
+    for class_id in range(43):
+        dir_path = os.path.join(base_dir, split, f"{class_id:02d}")
+        Path(dir_path).mkdir(parents=True, exist_ok=True)
+
 def organize_images(row: pd.Series) -> str:
     """
     Organizza le immagini nelle directory corrispondenti allo split assegnato.
-
-    Args:
-        row: Riga del DataFrame contenente le informazioni dell'immagine
-
-    Returns:
-        Percorso di destinazione dell'immagine copiata
     """
+    
     src_path = os.path.join(DATA_SOURCE_ROOT, "resized_images", row['filename'])
-    dest_path = os.path.join(OUTPUT_DIR, row['split'], str(row['feature_index']))
-    Path(dest_path).mkdir(parents=True, exist_ok=True)
+    dest_dir = os.path.join(OUTPUT_DIR, row['split'], f"{row['feature_index']:02d}")
+    dest_path = os.path.join(dest_dir, row['filename'])
     
     shutil.copy(src_path, dest_path)
     return dest_path
@@ -73,32 +91,72 @@ def create_folder_sets() -> None:
 
 def split_dataset(metadata: pd.DataFrame) -> pd.DataFrame:
     """
-    Suddivide il dataset in train, validation e test mantenendo l'integrità dei cluster.
-
-    Args:
-        metadata: DataFrame contenente i metadati da suddividere
-
-    Returns:
-        DataFrame con la colonna aggiuntiva 'split' che indica la partizione
+    Suddivide il dataset in train/validation/test mantenendo:
+    1. Cluster interi nello stesso split
+    2. Distribuzione delle etichette bilanciata
+    3. Gestione di edge case critici
     """
     seed = int(os.getenv("SEED_GROUP_SHUFFLE_DATASET", 42))
     test_size = float(os.getenv("TEST_SIZE_DATASET", 0.2))
     val_size = float(os.getenv("VAL_SIZE_DATASET", 0.1))
 
-    # Split stratified mantenendo i cluster intatti
-    splitter = GroupShuffleSplit(n_splits=1, test_size=test_size + val_size, random_state=seed)
-    _, temp_idx = next(splitter.split(metadata, groups=metadata['cluster_id']))
+    # 1. Preparazione dati a livello di cluster
+    cluster_labels = metadata.drop_duplicates('cluster_id')[['cluster_id', 'feature_index']]
+    
+    # 2. Controllo edge case: numero minimo di cluster per etichetta
+    label_counts = cluster_labels['feature_index'].value_counts()
+    problematic_labels = label_counts[label_counts < 3].index.tolist()
+    
+    if problematic_labels:
+        print(f"Etichette {problematic_labels} hanno meno di 3 cluster. Impossibile garantire split bilanciato.")
+        cluster_labels = cluster_labels.loc[~cluster_labels['feature_index'].isin(problematic_labels)]
 
-    # Split ulteriore per validation/test
-    splitter_val_test = GroupShuffleSplit(n_splits=1, test_size=val_size/(test_size + val_size), random_state=seed)
-    val_idx, test_idx = next(splitter_val_test.split(metadata.iloc[temp_idx], groups=metadata.iloc[temp_idx]['cluster_id']))
+    # 3. Split stratificato a livello di cluster
+    # Primo split: train vs (val + test)
+    sss = StratifiedShuffleSplit(
+        n_splits=1,
+        test_size=test_size + val_size,
+        random_state=seed
+    )
+    
+    train_idx, temp_idx = next(sss.split(
+        X=cluster_labels[['cluster_id']], 
+        y=cluster_labels['feature_index']
+    ))
+    
+    # Secondo split: val vs test
+    sss_val_test = StratifiedShuffleSplit(
+        n_splits=1,
+        test_size=val_size/(test_size + val_size),
+        random_state=seed
+    )
+    
+    val_idx, test_idx = next(sss_val_test.split(
+        X=cluster_labels.iloc[temp_idx][['cluster_id']],
+        y=cluster_labels.iloc[temp_idx]['feature_index']
+    ))
 
-    # Assegnazione degli split
+    # 4. Mappatura dei cluster agli split
+    splits = {
+        'train': cluster_labels.iloc[train_idx]['cluster_id'],
+        'validation': cluster_labels.iloc[temp_idx[val_idx]]['cluster_id'],
+        'test': cluster_labels.iloc[temp_idx[test_idx]]['cluster_id']
+    }
+
     metadata['split'] = 'train'
-    metadata.iloc[temp_idx[val_idx], metadata.columns.get_loc('split')] = 'validation'
-    metadata.iloc[temp_idx[test_idx], metadata.columns.get_loc('split')] = 'test'
+    for split_name, clusters in splits.items():
+        metadata.loc[metadata['cluster_id'].isin(clusters), 'split'] = split_name
 
     return metadata
+
+def verify_splits(metadata):
+    return (
+        metadata
+        .groupby(['split', 'feature_index'])
+        .size()
+        .unstack()
+        .apply(lambda x: x/x.sum(), axis=1)
+    )
 
 def copy_images_to_output_path(metadata: pd.DataFrame) -> pd.DataFrame:
     """
@@ -110,6 +168,10 @@ def copy_images_to_output_path(metadata: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame con la colonna aggiuntiva 'image_path'
     """
+    
+    precreate_class_folders('train', OUTPUT_DIR)
+    precreate_class_folders('test', OUTPUT_DIR)
+    precreate_class_folders('validation', OUTPUT_DIR)
     metadata.apply(organize_images, axis=1)
     return metadata
 
@@ -139,7 +201,6 @@ def df_add_label_index_column(metadata: pd.DataFrame) -> pd.DataFrame:
     metadata["feature_index"] = metadata["feature_index"].astype(int)
 
     return metadata
-
 
 def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict) -> None:
     """

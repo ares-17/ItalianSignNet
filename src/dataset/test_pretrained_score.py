@@ -1,269 +1,254 @@
-from transformers import AutoImageProcessor, AutoModelForImageClassification
-from datasets import load_dataset
-from torch.utils.data import DataLoader
-from torch import stack, tensor, no_grad
 import os
-from dotenv import load_dotenv
-from datasets import ClassLabel
-import mlflow
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
-import numpy as np
 from pathlib import Path
-import matplotlib.pyplot as plt
-import numpy as np
+from typing import Any, Dict, List, Tuple
+import mlflow
 import torch
+from datasets import (
+    DatasetDict,
+    load_dataset,
+    ClassLabel,
+    Features,
+    Value,
+    Image,  
+)
+from dotenv import load_dotenv
+from matplotlib import pyplot as plt
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    precision_recall_fscore_support,
+)
+from torch import Tensor, no_grad, stack, tensor
+from torch.utils.data import DataLoader
+from transformers import (
+    AutoImageProcessor,
+    AutoModelForImageClassification,
+    ImageProcessingMixin,
+    PreTrainedModel,
+)
+import seaborn as sns
+import os
+import pandas as pd
+from datasets import DatasetDict, load_dataset, ClassLabel
+from typing import Dict, Any
+import numpy as np
+import logging
+import datetime
 
-REPO_MODEL = "bazyl/gtsrb-model"
+REPO_MODEL: str = "bazyl/gtsrb-model"
 
-def get_latest_dataset_folder():
+# use or create log's dir
+logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+os.makedirs(logs_dir, exist_ok=True)
+
+# logger definition
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.FileHandler(
+        os.path.join(logs_dir, f"test_pretrained_{datetime.now().strftime("%Y%m%d_%H%M%S")}_eps_{REPO_MODEL.replace('/', '_')}.log")
+    )]
+)
+LOGGER = logging.getLogger(__name__)
+
+def get_latest_dataset_folder() -> Tuple[str, str]:
     """
     Restituisce il percorso della cartella dataset più recente all'interno della directory degli artifacts.
-    
-    Cerca all'interno della cartella 'src/dataset/artifacts' quella subdirectory che, ordinata alfabeticamente, risulta essere l'ultima.
-    Se non viene trovata nessuna cartella, solleva un'eccezione.
-    
-    Returns:
-        str: Il percorso assoluto della cartella dataset più recente.
-    
-    Raises:
-        ValueError: Se non vengono trovate sottocartelle all'interno di 'artifacts'.
     """
-    BASE_DIR = Path(os.getenv("BASE_DIR"))
-    artifacts_dir = os.path.join(BASE_DIR, 'src', 'dataset', 'artifacts')
+    BASE_DIR = Path(os.getenv("BASE_DIR", ""))
+    artifacts_dir = BASE_DIR / "src" / "dataset" / "artifacts"
+
     all_subdirs = [
-        d for d in os.listdir(artifacts_dir) 
-        if os.path.isdir(os.path.join(artifacts_dir, d))
+        d for d in os.listdir(artifacts_dir) if (artifacts_dir / d).is_dir()
     ]
-    
     if not all_subdirs:
         raise ValueError("Nessuna cartella dataset trovata nella directory artifacts")
-    
-    newest = sorted(all_subdirs)[-1]
-    return os.path.join(artifacts_dir, newest), newest
 
-def preprocess(processor, examples):
+    newest = sorted(all_subdirs)[-1]
+    LOGGER.info(f"Dataset selezionato: {newest}")
+    return str(artifacts_dir / newest), newest
+
+def preprocess(
+    processor: ImageProcessingMixin, examples: Dict[str, Any]
+) -> Dict[str, Any]:
     """
-    Preprocessa un esempio del dataset estraendo i pixel e le etichette in un formato adatto al modello.
-    
-    Args:
-        processor: L'istanza del processor (AutoImageProcessor) usato per gestire il preprocessing delle immagini.
-        examples (dict): Un dizionario che contiene almeno le chiavi "image" e "label".
-    
-    Returns:
-        dict: Un dizionario contenente:
-            - "pixel_values": il tensore delle immagini processate
-            - "labels": l'etichetta associata all'immagine.
-    
-    Nota:
-        L'uso di `return_tensors="pt"` converte l'immagine in un tensore PyTorch.
+    Preprocessa un campione del dataset estraendo i pixel e le etichette in un formato adatto al modello.
     """
     inputs = processor(images=examples["image"], return_tensors="pt")
-    # Debug: stampa la forma del tensore
-    print(f"Forma del tensore di input: {inputs['pixel_values'].shape}")
     return {
         "pixel_values": inputs["pixel_values"].squeeze(),
-        "labels": examples["label"]
+        "labels": examples["label"],
     }
 
-def collate_fn(batch):
+def collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Tensor]:
     """
-    Funzione di collazione per il DataLoader, combinando più esempi in un singolo batch.
-    
-    Args:
-        batch (list): Una lista di dizionari, ciascuno contenente "pixel_values" e "labels".
-    
-    Returns:
-        dict: Un dizionario con:
-            - "pixel_values": un tensore creato impilando i tensori di ciascun esempio.
-            - "labels": un tensore contenente le etichette, ricostruito da ciascun esempio.
-    
-    Nota:
-        L'uso di stack e tensor assicura che il batch sia formato correttamente per il modello.
+    Funzione di collazione per il DataLoader.
     """
     return {
         "pixel_values": stack([tensor(x["pixel_values"]) for x in batch]),
-        "labels": tensor([x["labels"] for x in batch])
+        "labels": tensor([x["labels"] for x in batch]),
     }
 
-def evaluate(model, test_dataloader):
+def evaluate(
+    model: PreTrainedModel, test_dataloader: DataLoader
+) -> Tuple[List[int], List[int], List[float], List[int]]:
     """
-    Valuta il modello sul test set, accumulando le predizioni e le etichette.
-    
-    Args:
-        model: Il modello di classificazione, ad es. un'istanza di AutoModelForImageClassification.
-        test_dataloader: Il DataLoader che fornisce i batch del test set.
-    
-    Returns:
-        tuple: Una tupla contenente due liste:
-            - all_preds: Predizioni fatte dal modello su tutte le immagini.
-            - all_labels: Etichette reali per le immagini del test set.
-    
-    Nota:
-        - La funzione disabilita il calcolo del gradiente con `no_grad()` per migliorare le performance durante l'inferenza.
-        - Le predizioni vengono ottenute con `argmax` sui logits per ottenere la classe con massima probabilità.
+    Valuta il modello sul test set.
     """
-    all_preds = []
-    all_labels = []
-    confidence_scores = []
-    class_correct = [0] * 43  # Per 43 classi del GTSRB
-    class_total = [0] * 43
-    
+    all_preds: List[int] = []
+    all_labels: List[int] = []
+
+    class_correct: List[int] = [0] * 43
+    class_total: List[int] = [0] * 43
+
     with no_grad():
         for batch in test_dataloader:
             outputs = model(pixel_values=batch["pixel_values"])
             logits = outputs.logits
             probs = torch.nn.functional.softmax(logits, dim=1)
-            confidence, preds = torch.max(probs, dim=1)
-            
-            # Calcola statistiche per classe
+            _, preds = torch.max(probs, dim=1)
+
             for i in range(len(preds)):
                 label = batch["labels"][i].item()
                 pred = preds[i].item()
                 class_total[label] += 1
                 if pred == label:
                     class_correct[label] += 1
-            
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(batch["labels"].cpu().numpy())
-            confidence_scores.extend(confidence.cpu().numpy())
-    
-    # Calcola accuratezza per classe
-    for i in range(43):
-        accuracy = class_correct[i] / class_total[i] if class_total[i] > 0 else 0
-        print(f"Classe {i}: {accuracy:.4f} ({class_correct[i]}/{class_total[i]})")
-    
-    # Analizza predizioni con bassa confidenza
-    low_confidence_indices = [i for i, conf in enumerate(confidence_scores) if conf < 0.5]
-    print(f"Predizioni con bassa confidenza: {len(low_confidence_indices)}")
-    
-    return all_preds, all_labels, confidence_scores
 
-def mlflow_tracking(all_labels, all_preds, datasets_folder, folder_name):
-    """
-    Calcola le metriche di valutazione e registra le metriche e gli artefatti (come la matrice di confusione)
-    su MLflow.
+            all_preds.extend(preds.cpu().tolist())
+            all_labels.extend(batch["labels"].cpu().tolist())
+
+    present_classes = sorted(list(set(all_labels)))
+    LOGGER.info("\nAccuracy per classe:")
+    for cls in present_classes:
+        accuracy = class_correct[cls] / class_total[cls] if class_total[cls] > 0 else 0
+        LOGGER.info(f"Classe {cls}: {accuracy:.4f} ({class_correct[cls]}/{class_total[cls]})")
+
+    return all_preds, all_labels, present_classes
+
+def plot_confusion_matrix(all_labels, all_preds, present_classes):
+    conf_matrix = confusion_matrix(all_labels, all_preds, labels=present_classes)
     
-    Args:
-        all_labels (list): Lista delle etichette reali.
-        all_preds (list): Lista delle predizioni fatte dal modello.
-        datasets_folder (str): Il percorso della cartella del dataset per tracciare la versione del dataset.
-        folder_name (str): Nome della cartella che contiene il dataset
+    # Create a custom annotation array that leaves cells blank if the value is 0
+    annot = np.where(conf_matrix == 0, "", conf_matrix)
+    
+    fig, ax = plt.subplots(figsize=(12, 10))
+    sns.heatmap(conf_matrix, annot=annot, fmt="", cmap="Blues", ax=ax, cbar=False)
+    ax.set_title("Confusion Matrix")
+    ax.set_xlabel("Predicted Labels")
+    ax.set_ylabel("True Labels")
+    ax.xaxis.set_ticklabels(present_classes)
+    ax.yaxis.set_ticklabels(present_classes)
+    fig.tight_layout()
+    
+    return fig
+
+def mlflow_tracking(
+    all_labels: List[int],
+    all_preds: List[int],
+    datasets_folder: str,
+    folder_name: str,
+    present_classes: List[int],
+) -> None:
+    """
+    Registra metriche e artefatti su MLflow, inclusi report dettagliati.
     """
     accuracy = accuracy_score(all_labels, all_preds)
     precision, recall, f1, _ = precision_recall_fscore_support(
-        all_labels, all_preds, average='weighted'
+        all_labels, all_preds, labels=present_classes, average="weighted", zero_division=0
     )
-    conf_matrix = confusion_matrix(all_labels, all_preds)
-    
-    mlflow.set_tracking_uri('http://localhost:5000')
 
-    # Logging su MLflow
-    with mlflow.start_run(run_name=f"{REPO_MODEL}_{folder_name}") as run:
+    mlflow.set_tracking_uri("http://localhost:5000")
+
+    with mlflow.start_run(run_name=f"{REPO_MODEL}_{folder_name}"):
         mlflow.log_metric("test_accuracy", accuracy)
         mlflow.log_metric("test_precision", precision)
         mlflow.log_metric("test_recall", recall)
         mlflow.log_metric("test_f1", f1)
-        
-        # Log della confusion matrix come artefatto
-        np.savetxt("confusion_matrix.csv", conf_matrix, delimiter=",")
-        mlflow.log_artifact("confusion_matrix.csv")
-        
-        # Log dei parametri del modello
-        mlflow.log_param("model_name", "bazyl/gtsrb-model")
+        mlflow.log_figure(plot_confusion_matrix(all_labels, all_preds, present_classes), "confusion_matrix.png")
+        mlflow.log_param("model_name", REPO_MODEL)
         mlflow.log_param("dataset_version", os.path.basename(datasets_folder))
 
-    print("Metriche loggate con successo:")
-    print(f"Accuracy: {accuracy:.4f}")
-    print(f"Precision: {precision:.4f}")
-    print(f"Recall: {recall:.4f}")
-    print(f"F1-Score: {f1:.4f}")
+    LOGGER.info("Metriche loggate con successo:")
+    LOGGER.info(f"Accuracy: {accuracy:.4f}")
+    LOGGER.info(f"Precision: {precision:.4f}")
+    LOGGER.info(f"Recall: {recall:.4f}")
+    LOGGER.info(f"F1-Score: {f1:.4f}")
 
-def visualize_preprocessing(processor, dataset_path):
-    # Carica alcune immagini esempio
-    dataset = load_dataset("imagefolder", data_dir=dataset_path)
-    
-    # Prendi 3 immagini di esempio
-    samples = [dataset["train"][i]["image"] for i in range(3)]
-    
-    # Visualizza le immagini originali
-    plt.figure(figsize=(15, 10))
-    for i, img in enumerate(samples):
-        plt.subplot(2, 3, i+1)
-        plt.imshow(img)
-        plt.title(f"Originale {i}")
-    
-    # Processa le immagini
-    processed = processor(images=samples, return_tensors="pt")
-    
-    # Visualizza le immagini processate (denormalizzate per la visualizzazione)
-    for i, img_tensor in enumerate(processed["pixel_values"]):
-        # Denormalizza
-        img_array = img_tensor.permute(1, 2, 0).numpy()
-        img_array = img_array * np.array(processor.image_std) + np.array(processor.image_mean)
-        img_array = np.clip(img_array, 0, 1)
-        
-        plt.subplot(2, 3, i+4)
-        plt.imshow(img_array)
-        plt.title(f"Processata {i}")
-    
-    plt.tight_layout()
-    plt.savefig("preprocessing_comparison.png")
-    plt.close()
-    
-    print("Confronto salvato in 'preprocessing_comparison.png'")
-
-def validate_dataset_structure(dataset):
-    """Verifica che il dataset abbia la struttura corretta"""
-    # Verifica la presenza di train e test
+def validate_dataset_structure(dataset: DatasetDict) -> None:
+    """
+    Verifica che il dataset abbia la struttura corretta.
+    """
     if "train" not in dataset or "test" not in dataset:
         raise ValueError("Il dataset deve contenere split 'train' e 'test'")
-    
-    # Verifica il numero di classi
-    train_labels = set([example["label"] for example in dataset["train"]])
-    test_labels = set([example["label"] for example in dataset["test"]])
-    
-    print(f"Numero di classi nel train set: {len(train_labels)}")
-    print(f"Numero di classi nel test set: {len(test_labels)}")
-    
-    # Verifica se ci sono classi che non sono presenti in entrambi gli split
+
+    train_labels = set(example["label"] for example in dataset["train"])
+    test_labels = set(example["label"] for example in dataset["test"])
+
+    LOGGER.info(f"Numero di classi nel train set: {len(train_labels)}")
+    LOGGER.info(f"Numero di classi nel test set: {len(test_labels)}")
+
     train_only = train_labels - test_labels
     test_only = test_labels - train_labels
-    
-    if train_only:
-        print(f"Attenzione: Classi presenti solo nel train set: {sorted(train_only)}")
-    
-    if test_only:
-        print(f"Attenzione: Classi presenti solo nel test set: {sorted(test_only)}")
-    
-    return True
 
-def main():
+    if train_only:
+        LOGGER.info(f"Attenzione: Classi presenti solo nel train set: {sorted(train_only)}")
+    if test_only:
+        LOGGER.info(f"Attenzione: Classi presenti solo nel test set: {sorted(test_only)}")
+ 
+def load_dataset_with_features(data_dir: str, metadata_path: str) -> DatasetDict:
+    metadata = pd.read_parquet(metadata_path)
+    filename_to_label = dict(zip(metadata['filename'], metadata['feature_index'].astype(int)))
+
+    features = Features({
+        'image': Image(),
+        'label': Value('int64')
+    })
+
+    dataset = load_dataset(
+        "imagefolder",
+        data_dir=data_dir,
+        drop_labels=True,
+        features=features
+    )
+
+    def add_right_labels(example: Dict[str, Any]) -> Dict[str, Any]:
+        filename = os.path.basename(os.path.basename(example['image'].filename))
+        example['label'] = filename_to_label[filename]
+        return example
+
+    for split in dataset:
+        dataset[split] = dataset[split].map(add_right_labels)
+
+    return dataset.cast_column("label", ClassLabel(num_classes=43))
+
+def main() -> None:    
     load_dotenv()
-    
     datasets_folder, folder_name = get_latest_dataset_folder()
-    dataset = load_dataset("imagefolder", data_dir=datasets_folder)
-    dataset = dataset.cast_column("label", ClassLabel(num_classes=43))
+    metadata_path = os.path.join(datasets_folder, "metadata.parquet")
+
+    dataset = load_dataset_with_features(
+        data_dir=datasets_folder,
+        metadata_path=metadata_path
+    )
 
     processor = AutoImageProcessor.from_pretrained(REPO_MODEL)
-    model = AutoModelForImageClassification.from_pretrained(REPO_MODEL)
-    
-    processor = AutoImageProcessor.from_pretrained("bazyl/gtsrb-model")
-    print("Specifiche di normalizzazione del modello:")
-    print(f"Normalizzazione: {processor.do_normalize}")
-    print(f"Valori medi: {processor.image_mean}")
-    print(f"Valori std: {processor.image_std}")
-    print(f"Dimensione immagine: {processor.size}")
-    
-    visualize_preprocessing(processor, datasets_folder)
-    validate_dataset_structure(dataset)
-    
-    return
-    dataset = dataset.map((lambda x: preprocess(processor, x)), batched=True, remove_columns=["image"])
-    test_dataloader = DataLoader(dataset["test"], batch_size=4, collate_fn=collate_fn)
+    model: PreTrainedModel = AutoModelForImageClassification.from_pretrained(REPO_MODEL)
     model.eval()
 
-    all_preds, all_labels = evaluate(model, test_dataloader)
-    mlflow_tracking(all_labels, all_preds, datasets_folder, folder_name)
-    
+    LOGGER.info("Specifiche di normalizzazione del modello:")
+    LOGGER.info(f"Normalizzazione: {processor.do_normalize}")
+    LOGGER.info(f"Valori medi: {processor.image_mean}")
+    LOGGER.info(f"Valori std: {processor.image_std}")
+    LOGGER.info(f"Dimensione immagine: {processor.size}")
+
+    validate_dataset_structure(dataset)
+
+    dataset = dataset.map(lambda x: preprocess(processor, x), batched=True, remove_columns=["image"])
+    test_dataloader = DataLoader(dataset["test"], batch_size=4, collate_fn=collate_fn)
+
+    all_preds, all_labels, present_classes = evaluate(model, test_dataloader)
+    mlflow_tracking(all_labels, all_preds, datasets_folder, folder_name, present_classes)
+
 if __name__ == "__main__":
     main()

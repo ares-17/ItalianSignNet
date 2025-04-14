@@ -33,7 +33,7 @@ Questo script esegue il clustering dei cartelli stradali utilizzando l'algoritmo
 6. Tutte le informazioni di log vengono scritte in un file denominato "dbscan_TIMESTAMP_eps_DBSCAN_DISTANCE.log" 
    nella stessa cartella dello script.
 
-7. **Nuova funzionalità:** Le informazioni dei cluster vengono salvate in un file JSON che include:
+7. Le informazioni dei cluster vengono salvate in un file JSON che include:
     - La mappatura dei cluster per etichetta, con chiavi univoche (concatenazione di label e id DBSCAN)
     - Un report riepilogativo con il numero di cluster per label, la cardinalità del cluster più grande,
       la distribuzione per label e la distribuzione totale dei cluster.
