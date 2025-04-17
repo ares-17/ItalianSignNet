@@ -1,19 +1,19 @@
 from transformers import MobileViTImageProcessor, MobileViTV2ForImageClassification
-from PIL import Image
-import requests
+from model_utils import (TestModel, get_latest_dataset_folder)
 
 REPO_MODEL="shehan97/mobilevitv2-1.0-imagenet1k-256"
 
-url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-image = Image.open(requests.get(url, stream=True).raw)
+def main() -> None:        
+    processor = MobileViTImageProcessor.from_pretrained(REPO_MODEL)
+    model = MobileViTV2ForImageClassification.from_pretrained(REPO_MODEL)
+    model.eval()
+    
+    dataset_folder, folder_name = get_latest_dataset_folder()
+    
+    utils = TestModel(REPO_MODEL, model, processor, dataset_folder, folder_name)
+    utils.load_local_dataset()
+    utils.log_info()
+    utils.evaluate_in_mlflow()
 
-processor = MobileViTImageProcessor.from_pretrained(REPO_MODEL)
-model = MobileViTV2ForImageClassification.from_pretrained(REPO_MODEL)
-
-inputs = processor(images=image, return_tensors="pt")
-
-outputs = model(**inputs)
-logits = outputs.logits
-
-predicted_class_idx = logits.argmax(-1).item()
-print("Predicted class:", model.config.id2label[predicted_class_idx])
+if __name__ == "__main__":
+    main()

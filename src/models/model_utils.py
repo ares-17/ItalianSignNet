@@ -220,10 +220,19 @@ class TestModel:
 
     def _log_processor_info(self):
         self.logger.info("Model normalization specifications:")
-        self.logger.info(f"Normalization: {self.processor.do_normalize}")
-        self.logger.info(f"Mean values: {self.processor.image_mean}")
-        self.logger.info(f"Standard deviation values: {self.processor.image_std}")
         self.logger.info(f"Image size: {self.processor.size}")
+        
+        if hasattr(self.processor, 'image_mean'):
+            self.logger.info(f"image_mean: {self.processor.image_mean}")
+            
+        if hasattr(self.processor, 'do_normalize'):
+            self.logger.info(f"do_normalize: {self.processor.do_normalize}")
+            
+        if hasattr(self.processor, 'image_std'):
+            self.logger.info(f"image_std: {self.processor.image_std}")
+            
+        if hasattr(self.processor, 'size'):
+            self.logger.info(f"size: {self.processor.size}")
 
     def load_local_dataset(self) -> DataLoader:
         load_dotenv()
