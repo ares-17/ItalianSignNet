@@ -3,7 +3,7 @@ from transformers import (
     AutoModelForImageClassification,
     PreTrainedModel,
 )
-from model_utils import (TestModel, get_latest_dataset_folder)
+from vitpatch_utils import (VitPatchUtils, get_latest_dataset_folder)
 
 REPO_MODEL = "bazyl/gtsrb-model"
 
@@ -14,7 +14,7 @@ def main() -> None:
     
     dataset_folder, folder_name = get_latest_dataset_folder()
     
-    utils = TestModel(REPO_MODEL, model, processor, dataset_folder, folder_name)
+    utils = VitPatchUtils(REPO_MODEL, model, processor, dataset_folder, folder_name)
     utils.load_local_dataset()
     utils.log_info()
     utils.evaluate_in_mlflow()

@@ -29,6 +29,8 @@ from typing import Dict, Any
 import numpy as np
 import logging
 from datetime import datetime
+from torchvision import transforms
+from sklearn.metrics import classification_report
 
 def get_latest_dataset_folder() -> Tuple[str, str]:
     """
@@ -46,7 +48,7 @@ def get_latest_dataset_folder() -> Tuple[str, str]:
     newest = sorted(all_subdirs)[-1]
     return os.path.join(artifacts_dir, newest), newest
 
-class TestModel:
+class MobileVitPatchUtils:
     def __init__(self, model_name: str, model: PreTrainedModel, processor: Any, datasets_folder: str, folder_name: str):
         self.repo_model: str = model_name
         self.logger = self._setup_logger()
@@ -55,6 +57,10 @@ class TestModel:
         self.processor = processor
         self.datasets_folder = datasets_folder 
         self.folder_name = folder_name 
+        self.normalize = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],    # ImageNet mean
+            std=[0.229, 0.224, 0.225]      # ImageNet std
+        )
         
     def _setup_logger(self) -> logging.Logger:
         """Initialize and return a logger with file handler."""
@@ -75,9 +81,18 @@ class TestModel:
         """
         Preprocesses a dataset sample by extracting pixel values and labels in a format suitable for the model.
         """
-        inputs = self.processor(images=examples["image"], return_tensors="pt")
+        inputs = inputs = self.processor(
+            images=examples["image"],
+            return_tensors="pt",
+            do_center_crop=False,        
+            do_flip_channel_order=False
+        )
+        
+        pixel_values = inputs["pixel_values"].squeeze()
+        pixel_values = self.normalize(pixel_values)
+        
         return {
-            "pixel_values": inputs["pixel_values"].squeeze(),
+            "pixel_values": pixel_values,
             "labels": examples["label"],
         }
 
@@ -120,6 +135,10 @@ class TestModel:
                 all_labels.extend(batch["labels"].cpu().tolist())
         
         present_classes = sorted(list(set(all_labels)))
+        
+        report = classification_report(all_labels, all_preds, target_names=present_classes, digits=4)
+        self.logger.info(report)
+        
         self.logger.info("\nAccuracy per class:")
         for cls in present_classes:
             accuracy = class_correct[cls] / class_total[cls] if class_total[cls] > 0 else 0
