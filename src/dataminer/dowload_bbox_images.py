@@ -21,11 +21,11 @@ Dipendenza principale: modulo Dataminer.py
 """
 
 load_dotenv()
-BASE_DIR = Path(os.getenv("BASE_DIR"))
+BASE_DIR = Path(os.getenv("BASE_DIR", ""))
+NO_ASK_TO_OVWEWRITE_OLD_TESTS = os.getenv("NO_ASK_TO_OVWEWRITE_OLD_TESTS", False)
 n_threads = 4
-cartellaBase = BASE_DIR / 'testing' #Inserire percorso locale per testing
+cartellaBase = os.path.join(BASE_DIR / 'testing')
 z = 14  # Livello di zoom per le tile
-
 
 parser = argparse.ArgumentParser(
     description="Script per il download e processing di dati geospaziali dall'API Mapillary."
@@ -44,18 +44,20 @@ ur_lat = args.ur_lat
 ur_lon = args.ur_lon
 nome_esecuzione = args.nome_esecuzione
 
-# Configurazione del logger: il file di log avrà come nome il timestamp corrente.
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = os.path.join(cartellaBase, nome_esecuzione, f"log_{timestamp}.log")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(log_filename),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+def setup_logger(level=logging.INFO) -> logging.Logger:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = os.path.join(cartellaBase, nome_esecuzione , f"{timestamp}.log")
+
+    logger = logging.getLogger(__name__)
+    logger.setLevel(level)
+
+    if not logger.handlers:
+        file_handler = logging.FileHandler(log_path)
+        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+    return logger
 
 
 # Configurazione percorsi di output
@@ -74,15 +76,16 @@ percorso_configurazione = BASE_DIR / 'src/resources/traffic-signs.txt'
 with open(percorso_configurazione, 'r') as f:
     custom_signals = [line.strip() for line in f]
 
-data = Dataminer(logger)
-data.chooseConfiguration(Type.CUSTOM)
-
 #Impostazione righe e colonne in cui suddividere l'area
 rows = 6
 cols = 12
 
 
 if os.path.exists(percorso_esecuzione):
+    logger = setup_logger()
+    data = Dataminer(logger)
+    data.chooseConfiguration(Type.CUSTOM)
+
     if os.path.exists(geojson_file_path) and not os.listdir(outputRitagli):
         continua_download = input("Esecuzione già iniziata, vuoi continuare il download? (s/n): ")
         if continua_download.lower() == 's':
@@ -137,7 +140,11 @@ if os.path.exists(percorso_esecuzione):
             exit()
 
     elif os.listdir(outputRitagli):  # Esecuzione già completata - qui va lo stesso codice della sovrascrittura
-        sovrascrivi = input("Esecuzione già esistente. Vuoi sovrascriverla? (s/n): ")
+        if NO_ASK_TO_OVWEWRITE_OLD_TESTS:
+            sovrascrivi = 'n'
+        else:
+            sovrascrivi = input("Esecuzione già esistente. Vuoi sovrascriverla? (s/n): ")
+        
         if sovrascrivi.lower() == 's':
             for cartella in [outputFolderImages, outputFolderAnnotationsImage, outputFolderBounded, outputFolderCSV,
                              outputRitagli]:
@@ -171,8 +178,6 @@ if os.path.exists(percorso_esecuzione):
 
             data.downloadDataSet(n_threads, geojsonFolder, outputFolderAnnotationsImage, outputFolderImages,
                                  NumberSelector(), custom_signals=custom_signals, check=0)  # Avvia il download
-
-
         elif sovrascrivi.lower() == 'n':
             print("Esecuzione annullata.")
             exit()
@@ -181,6 +186,10 @@ if os.path.exists(percorso_esecuzione):
             exit()
 else:  # Nuova esecuzione
     utility.folder_maker(cartellaBase, nome_esecuzione)
+    logger = setup_logger()
+    data = Dataminer(logger)
+    data.chooseConfiguration(Type.CUSTOM)
+
     data.downloadGeojson(ll_lat, ll_lon, ur_lat, ur_lon, z, geojsonFolder, rows, cols, percorso_configurazione,
                          nome_esecuzione)
     geojsonFilePathList = []  # Crea la lista di percorsi GeoJSON
