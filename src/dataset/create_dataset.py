@@ -89,16 +89,33 @@ def create_folder_sets() -> None:
         dir_path = os.path.join(OUTPUT_DIR, split)
         Path(dir_path).mkdir(parents=True, exist_ok=True)
 
+def aggregate_too_small_cluster_val_test(cluster_labels, temp_idx):
+    temp_clusters = cluster_labels.iloc[temp_idx].copy()
+    temp_label_counts = temp_clusters['feature_index'].value_counts()
+    too_small_classes = temp_label_counts[temp_label_counts < 2].index.tolist()
+
+    if too_small_classes:
+        print(f"Classi troppo piccole per il secondo split: {too_small_classes}")
+        temp_clusters = temp_clusters[~temp_clusters['feature_index'].isin(too_small_classes)]
+
+    return temp_clusters
+
 def split_dataset(metadata: pd.DataFrame) -> pd.DataFrame:
     """
     Suddivide il dataset in train/validation/test mantenendo:
     1. Cluster interi nello stesso split
     2. Distribuzione delle etichette bilanciata
     3. Gestione di edge case critici
+    4. Solo classi con almeno 10 cartelli
     """
     seed = int(os.getenv("SEED_GROUP_SHUFFLE_DATASET", 42))
     test_size = float(os.getenv("TEST_SIZE_DATASET", 0.2))
     val_size = float(os.getenv("VAL_SIZE_DATASET", 0.1))
+
+    # 0. Filtro: considera solo classi con almeno 10 cartelli totali
+    label_counts_total = metadata['feature_index'].value_counts()
+    valid_labels = label_counts_total[label_counts_total >= 10].index.tolist()
+    metadata = metadata[metadata['feature_index'].isin(valid_labels)]
 
     # 1. Preparazione dati a livello di cluster
     cluster_labels = metadata.drop_duplicates('cluster_id')[['cluster_id', 'feature_index']]
@@ -112,7 +129,6 @@ def split_dataset(metadata: pd.DataFrame) -> pd.DataFrame:
         cluster_labels = cluster_labels.loc[~cluster_labels['feature_index'].isin(problematic_labels)]
 
     # 3. Split stratificato a livello di cluster
-    # Primo split: train vs (val + test)
     sss = StratifiedShuffleSplit(
         n_splits=1,
         test_size=test_size + val_size,
@@ -124,23 +140,26 @@ def split_dataset(metadata: pd.DataFrame) -> pd.DataFrame:
         y=cluster_labels['feature_index']
     ))
     
-    # Secondo split: val vs test
+    # 4. Split val/test
     sss_val_test = StratifiedShuffleSplit(
         n_splits=1,
-        test_size=val_size/(test_size + val_size),
+        test_size=val_size / (test_size + val_size),
         random_state=seed
     )
     
+    val_test_cluster_labels_normalized = \
+        aggregate_too_small_cluster_val_test(cluster_labels, temp_idx)
+
     val_idx, test_idx = next(sss_val_test.split(
-        X=cluster_labels.iloc[temp_idx][['cluster_id']],
-        y=cluster_labels.iloc[temp_idx]['feature_index']
+        X=val_test_cluster_labels_normalized[['cluster_id']],
+        y=val_test_cluster_labels_normalized['feature_index']
     ))
 
-    # 4. Mappatura dei cluster agli split
+    # 5. Mappatura dei cluster agli split
     splits = {
         'train': cluster_labels.iloc[train_idx]['cluster_id'],
-        'validation': cluster_labels.iloc[temp_idx[val_idx]]['cluster_id'],
-        'test': cluster_labels.iloc[temp_idx[test_idx]]['cluster_id']
+        'validation': val_test_cluster_labels_normalized.iloc[val_idx]['cluster_id'],
+        'test': val_test_cluster_labels_normalized.iloc[test_idx]['cluster_id']
     }
 
     metadata['split'] = 'train'
