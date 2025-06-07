@@ -162,3 +162,4 @@ src/dataset/*/train/
 src/dataset/*/validation/
 src/dataset/artifacts/
 mlartifacts
+*.weights.h5

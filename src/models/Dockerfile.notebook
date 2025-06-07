@@ -15,7 +15,13 @@ RUN pip install \
     numpy pandas matplotlib opencv-python pillow \
     scikit-learn \
     tensorflow==2.15.0 \
-    tensorflow_model_optimization
+    tensorflow_model_optimization \
+    albumentations
+
+RUN pip install \
+    lime \
+    pyarrow \
+    seaborn
 
 WORKDIR /workspace
 EXPOSE 8888
