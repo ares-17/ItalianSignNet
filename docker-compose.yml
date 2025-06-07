@@ -1,0 +1,33 @@
+services:  
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    container_name: mlflow-server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlflow_data:/mlflow/mlflow_data
+    networks:
+      - ml-network
+
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile.notebook
+    container_name: jupyter-lab
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    command: >
+      jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+    networks:
+      - ml-network
+    depends_on:
+      - mlflow
+
+networks:
+  ml-network:
+    driver: bridge

@@ -163,3 +163,6 @@ src/dataset/*/validation/
 src/dataset/artifacts/
 mlartifacts
 *.weights.h5
+
+mlflow_data/*
+!mlflow_data/README.md
