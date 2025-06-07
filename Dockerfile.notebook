@@ -21,7 +21,11 @@ RUN pip install \
 RUN pip install \
     lime \
     pyarrow \
-    seaborn
+    seaborn \
+    mlflow \
+    seaborn \
+    scikit-image \
+    pyarrow
 
 WORKDIR /workspace
 EXPOSE 8888
