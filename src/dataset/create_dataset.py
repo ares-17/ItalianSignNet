@@ -27,6 +27,7 @@ OUTPUT_DIR = os.path.join(BASE_DIR or '', 'src', 'dataset', 'artifacts', f'datas
 LABEL_INDEX_FILE = os.path.join(BASE_DIR or '', 'src', 'utils', 'signnames.csv')
 MUNICIPALITIES_LIMIT_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'limits_IT_municipalities.geojson')
 REGIONS_LIMIT_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'limits_IT_regions.geojson')
+REDDITI_IRPEF_2023_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'Redditi_e_principali_variabili_IRPEF_su_base_subcomunale_CSV_2023.csv')
 
 mlflow.set_tracking_uri('http://localhost:5000')
 
@@ -462,6 +463,101 @@ def define_logger():
     )
     return logging.getLogger(__name__)
 
+def add_income_to_metadata(metadata_df, income_csv_path, logger: logging.Logger):
+    """
+    Aggiunge la colonna del reddito complessivo per comune al dataframe metadata.
+    
+    Args:
+        metadata_df: DataFrame con le colonne filename, feature, feature_index, coordinates, com_istat_code
+        income_csv_path: Path del file CSV contenente i dati del reddito
+    
+    Returns:
+        DataFrame con la nuova colonna 'total_income_per_municipality'
+    """
+    
+    try:
+        income_df = pd.read_csv(income_csv_path, sep=';', encoding='utf-8')
+        logger.info(f"File CSV caricato con successo. Shape: {income_df.shape}")
+    except Exception as e:
+        logger.error(f"Errore nella lettura del file CSV: {e}")
+        return metadata_df
+    
+    istat_code_col = None
+    income_amount_col = None
+    
+    for col in income_df.columns:
+        col_lower = col.lower().strip()
+        if 'codice istat comune' in col_lower:
+            istat_code_col = col
+        elif 'reddito complessivo - ammontare in euro' in col_lower:
+            income_amount_col = col
+    
+    if istat_code_col is None:
+        logger.error("ERRORE: Colonna 'Codice Istat Comune' non trovata nel CSV")
+        return metadata_df
+    
+    if income_amount_col is None:
+        logger.error("ERRORE: Colonna 'Reddito complessivo - Ammontare in euro' non trovata nel CSV")
+        return metadata_df
+    
+    logger.info(f"Colonna codice ISTAT trovata: '{istat_code_col}'")
+    logger.info(f"Colonna reddito trovata: '{income_amount_col}'")
+    
+    # Seleziona solo le colonne necessarie
+    income_subset = income_df[[istat_code_col, income_amount_col]].copy()
+    
+    # Converti i codici ISTAT in string di 6 caratteri
+    income_subset[istat_code_col] = income_subset[istat_code_col].astype(str).str.zfill(6)
+    
+    # Gestisci i valori mancanti o non numerici nella colonna del reddito
+    income_subset[income_amount_col] = pd.to_numeric(income_subset[income_amount_col], errors='coerce')
+    
+    # Rimuovi le righe con valori mancanti
+    income_subset = income_subset.dropna()
+    
+    logger.info(f"Righe valide per l'aggregazione: {len(income_subset)}")
+    
+    # Aggrega i dati per codice ISTAT (somma i redditi per comune)
+    logger.info("Aggregazione dei dati per codice ISTAT...")
+    income_aggregated = income_subset.groupby(istat_code_col)[income_amount_col].sum().reset_index()
+    income_aggregated.columns = ['com_istat_code', 'total_income_per_municipality']
+    
+    # Converti anche la colonna com_istat_code del metadata in string
+    metadata_df = metadata_df.copy()
+    metadata_df['com_istat_code'] = metadata_df['com_istat_code'].astype(str)
+    
+    logger.info(f"Comuni unici nel dataset del reddito: {len(income_aggregated)}")
+    logger.info(f"Comuni unici nel metadata: {len(metadata_df['com_istat_code'].unique())}")
+    
+    # Merge dei dati
+    print("Unione dei dati...")
+    result_df = metadata_df.merge(
+        income_aggregated, 
+        on='com_istat_code', 
+        how='left'
+    )
+    
+    # Verifica quanti match sono stati trovati
+    matched_rows = result_df['total_income_per_municipality'].notna().sum()
+    total_rows = len(result_df)
+    
+    logger.info(f"Match trovati: {matched_rows}/{total_rows} righe ({matched_rows/total_rows*100:.1f}%)")
+    
+    # Mostra alcuni esempi di codici ISTAT che non hanno match
+    unmatched_codes = result_df[result_df['total_income_per_municipality'].isna()]['com_istat_code'].unique()
+    if len(unmatched_codes) > 0:
+        logger.warning(f"Esempi di codici ISTAT senza match: {unmatched_codes[:5]}")
+    
+    # Mostra statistiche della nuova colonna
+    if matched_rows > 0:
+        logger.info(f"\nStatistiche della colonna 'total_income_per_municipality':")
+        logger.info(f"Media: €{result_df['total_income_per_municipality'].mean():,.0f}")
+        logger.info(f"Mediana: €{result_df['total_income_per_municipality'].median():,.0f}")
+        logger.info(f"Min: €{result_df['total_income_per_municipality'].min():,.0f}")
+        logger.info(f"Max: €{result_df['total_income_per_municipality'].max():,.0f}")
+    
+    return result_df
+
 def main() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -482,8 +578,12 @@ def main() -> None:
         municipalities_file=MUNICIPALITIES_LIMIT_IT,
         logger=logger
     )
+    metadata = add_income_to_metadata(metadata, REDDITI_IRPEF_2023_IT, logger)
     metadata = assign_cluster_id(metadata, clusters)
     metadata = split_dataset(metadata)
+    pd.set_option('display.max_columns', None)
+    print(metadata.head())
+    return
     metadata = copy_images_to_output_path(metadata)
 
     save_to_parquet(metadata)
