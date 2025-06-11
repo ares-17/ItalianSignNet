@@ -8,6 +8,14 @@ import mlflow.data
 import pandas as pd
 from sklearn.model_selection import StratifiedShuffleSplit
 import shutil
+import logging
+from typing import Optional, Tuple
+import sys
+
+utils_path = os.path.join(os.path.dirname(__file__), "..")
+sys.path.append(utils_path)
+
+from utils.MunicipalGeocoder import MunicipalGeocoder
 
 TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -278,8 +286,184 @@ def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict) -> None:
 
         mlflow.log_artifact(CLUSTER_JSON_PATH)
 
+
+def parse_coordinates(coord_string: str) -> Optional[Tuple[float, float]]:
+    """
+    Parse coordinate string in format "latitude,longitude" to tuple of floats.
+    
+    Args:
+        coord_string: String in format "lat,lon" (e.g., "45.95898155906983,12.626659870147705")
+        
+    Returns:
+        Tuple of (latitude, longitude) or None if parsing fails
+    """
+    try:
+        if pd.isna(coord_string) or not isinstance(coord_string, str):
+            return None
+        
+        # Remove any whitespace and split by comma
+        coords = coord_string.strip().split(',')
+        if len(coords) != 2:
+            return None
+
+        return float(coords[0]), float(coords[1])
+        
+    except (ValueError, AttributeError) as e:
+        logging.warning(f"Failed to parse coordinates '{coord_string}': {e}")
+        return None
+
+def add_municipality_codes_to_dataframe(
+    df: pd.DataFrame, 
+    regions_file: str, 
+    municipalities_file: str,
+    coordinates_column: str = 'coordinates',
+    output_column: str = 'com_istat_code',
+    logger: Optional[logging.Logger] = None
+) -> pd.DataFrame:
+    """
+    Add municipality ISTAT codes to a DataFrame based on coordinates.
+    
+    Args:
+        df: Input DataFrame with coordinates
+        regions_file: Path to regions GeoJSON file
+        municipalities_file: Path to municipalities GeoJSON file
+        coordinates_column: Name of the column containing coordinates (default: 'coordinates')
+        output_column: Name of the output column for ISTAT codes (default: 'com_istat_code')
+        logger: Optional logger instance
+        
+    Returns:
+        DataFrame with added municipality codes column
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+    
+    # Create a copy to avoid modifying the original DataFrame
+    result_df = df.copy()
+    
+    # Initialize the geocoder
+    logger.info("Initializing municipal geocoder...")
+    geocoder = MunicipalGeocoder(regions_file, municipalities_file, logger)
+    
+    # Check if coordinates column exists
+    if coordinates_column not in df.columns:
+        raise ValueError(f"Column '{coordinates_column}' not found in DataFrame")
+    
+    # Parse coordinates and geocode
+    logger.info(f"Processing {len(df)} rows...")
+    municipality_codes = []
+    successful_geocodings = 0
+    
+    for idx, coord_string in enumerate(df[coordinates_column]):
+        if idx % 100 == 0 and idx > 0:
+            logger.info(f"Processed {idx}/{len(df)} rows...")
+        
+        # Parse coordinates
+        coords = parse_coordinates(coord_string)
+        if coords is None:
+            municipality_codes.append(None)
+            continue
+        
+        lat, lon = coords
+        
+        # Geocode
+        result = geocoder.geocode(lat, lon)
+        if result:
+            municipality_codes.append(result['com_istat_code'])
+            successful_geocodings += 1
+        else:
+            municipality_codes.append(None)
+    
+    result_df[output_column] = municipality_codes
+    logger.info(f"Geocoding completed: {successful_geocodings}/{len(df)} coordinates successfully geocoded")
+    
+    return result_df
+
+def add_municipality_codes_batch(
+    df: pd.DataFrame, 
+    regions_file: str, 
+    municipalities_file: str,
+    coordinates_column: str = 'coordinates',
+    output_column: str = 'com_istat_code',
+    logger: Optional[logging.Logger] = None
+) -> pd.DataFrame:
+    """
+    Add municipality ISTAT codes to a DataFrame using batch processing for better performance.
+    
+    Args:
+        df: Input DataFrame with coordinates
+        regions_file: Path to regions GeoJSON file
+        municipalities_file: Path to municipalities GeoJSON file
+        coordinates_column: Name of the column containing coordinates (default: 'coordinates')
+        output_column: Name of the output column for ISTAT codes (default: 'com_istat_code')
+        logger: Optional logger instance
+        
+    Returns:
+        DataFrame with added municipality codes column
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+    
+    # Create a copy to avoid modifying the original DataFrame
+    result_df = df.copy()
+    
+    # Initialize the geocoder
+    logger.info("Initializing municipal geocoder...")
+    geocoder = MunicipalGeocoder(regions_file, municipalities_file, logger)
+    
+    # Check if coordinates column exists
+    if coordinates_column not in df.columns:
+        raise ValueError(f"Column '{coordinates_column}' not found in DataFrame")
+    
+    # Parse all coordinates
+    logger.info("Parsing coordinates...")
+    coordinate_tuples = []
+    valid_indices = []
+    
+    for idx, coord_string in enumerate(df[coordinates_column]):
+        coords = parse_coordinates(coord_string)
+        if coords is not None:
+            coordinate_tuples.append(coords)
+            valid_indices.append(idx)
+    
+    logger.info(f"Found {len(coordinate_tuples)} valid coordinates out of {len(df)} rows")
+    
+    # Batch geocode
+    logger.info("Performing batch geocoding...")
+    geocoding_results = geocoder.geocode_batch(coordinate_tuples)
+    
+    # Create result array
+    municipality_codes = [None] * len(df)
+    successful_geocodings = 0
+    
+    for i, result in enumerate(geocoding_results):
+        original_idx = valid_indices[i]
+        if result:
+            municipality_codes[original_idx] = result['com_istat_code']
+            successful_geocodings += 1
+    
+    # Add the new column
+    result_df[output_column] = municipality_codes
+    
+    logger.info(f"Batch geocoding completed: {successful_geocodings}/{len(coordinate_tuples)} coordinates successfully geocoded")
+    
+    return result_df
+
+def define_logger():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    logs_dir = os.path.join(script_dir, "logs")
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_filename = os.path.join(logs_dir, f"create_dataset_{timestamp_str}_eps_{DBSCAN_DISTANCE}.log")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[logging.FileHandler(log_filename)]
+    )
+    return logging.getLogger(__name__)
+
 def main() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    logger = define_logger()
     
     with open(CLUSTER_JSON_PATH) as f:
         clustersInfo: dict = json.load(f)
@@ -290,6 +474,12 @@ def main() -> None:
     metadata: pd.DataFrame = pd.read_csv(os.path.join(DATA_SOURCE_ROOT, "annotations.csv"))
     metadata = df_add_label_index_column(metadata)
     metadata = add_coordinates_to_dataframe(metadata, clustersInfo['coordinates'])
+    metadata = add_municipality_codes_batch(
+        df=metadata,
+        regions_file="/home/aress/Documenti/tesi/ItalianSignNet/src/resources/limits_IT_regions.geojson",
+        municipalities_file="/home/aress/Documenti/tesi/ItalianSignNet/src/resources/limits_IT_municipalities.geojson",
+        logger=logger
+    )
     metadata = assign_cluster_id(metadata, clusters)
     metadata = split_dataset(metadata)
     metadata = copy_images_to_output_path(metadata)
