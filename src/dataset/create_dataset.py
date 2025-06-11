@@ -21,15 +21,17 @@ TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 load_dotenv()
 BASE_DIR = os.getenv("BASE_DIR")
-DATA_SOURCE_ROOT = os.path.join(BASE_DIR, os.getenv("TEST_CASE_BASE_ROOT"))
+DATA_SOURCE_ROOT = os.path.join(BASE_DIR or '', os.getenv("TEST_CASE_BASE_ROOT") or '')
 DBSCAN_DISTANCE = int(os.getenv("DBSCAN_DISTANCE", 100))
-OUTPUT_DIR = os.path.join(BASE_DIR, 'src', 'dataset', 'artifacts', f'dataset_{TIMESTAMP}_eps_{DBSCAN_DISTANCE}')
-LABEL_INDEX_FILE = os.path.join(BASE_DIR, 'src', 'utils', 'signnames.csv')
+OUTPUT_DIR = os.path.join(BASE_DIR or '', 'src', 'dataset', 'artifacts', f'dataset_{TIMESTAMP}_eps_{DBSCAN_DISTANCE}')
+LABEL_INDEX_FILE = os.path.join(BASE_DIR or '', 'src', 'utils', 'signnames.csv')
+MUNICIPALITIES_LIMIT_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'limits_IT_municipalities.geojson')
+REGIONS_LIMIT_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'limits_IT_regions.geojson')
 
 mlflow.set_tracking_uri('http://localhost:5000')
 
 def get_latest_json() -> str:
-    logs_dir = os.path.join(BASE_DIR, 'src', 'dataset', 'logs')
+    logs_dir = os.path.join(BASE_DIR or '', 'src', 'dataset', 'logs')
     json_files = [
         f for f in os.listdir(logs_dir)
         if f.endswith('.json') and os.path.isfile(os.path.join(logs_dir, f))
@@ -476,8 +478,8 @@ def main() -> None:
     metadata = add_coordinates_to_dataframe(metadata, clustersInfo['coordinates'])
     metadata = add_municipality_codes_batch(
         df=metadata,
-        regions_file="/home/aress/Documenti/tesi/ItalianSignNet/src/resources/limits_IT_regions.geojson",
-        municipalities_file="/home/aress/Documenti/tesi/ItalianSignNet/src/resources/limits_IT_municipalities.geojson",
+        regions_file=REGIONS_LIMIT_IT,
+        municipalities_file=MUNICIPALITIES_LIMIT_IT,
         logger=logger
     )
     metadata = assign_cluster_id(metadata, clusters)
