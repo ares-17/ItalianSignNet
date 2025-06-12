@@ -27,7 +27,12 @@ OUTPUT_DIR = os.path.join(BASE_DIR or '', 'src', 'dataset', 'artifacts', f'datas
 LABEL_INDEX_FILE = os.path.join(BASE_DIR or '', 'src', 'utils', 'signnames.csv')
 MUNICIPALITIES_LIMIT_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'limits_IT_municipalities.geojson')
 REGIONS_LIMIT_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'limits_IT_regions.geojson')
-REDDITI_IRPEF_2023_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'Redditi_e_principali_variabili_IRPEF_su_base_subcomunale_CSV_2023.csv')
+REDDITI_IRPEF_2023_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'Redditi_e_principali_variabili_IRPEF_su_base_comunale_CSV_2023.csv')
+
+ISTAT_CODE_COLUMN_METADATA = 'com_istat_code'
+ISTAT_CODE_COLUMN_CSV = 'Codice Istat Comune'
+INCOME_COLUMN_CSV = 'Reddito complessivo - Ammontare in euro'
+NEW_COLUMN_NAME = 'total_income'
 
 mlflow.set_tracking_uri('http://localhost:5000')
 
@@ -289,7 +294,6 @@ def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict) -> None:
 
         mlflow.log_artifact(CLUSTER_JSON_PATH)
 
-
 def parse_coordinates(coord_string: str) -> Optional[Tuple[float, float]]:
     """
     Parse coordinate string in format "latitude,longitude" to tuple of floats.
@@ -463,100 +467,111 @@ def define_logger():
     )
     return logging.getLogger(__name__)
 
-def add_income_to_metadata(metadata_df, income_csv_path, logger: logging.Logger):
+def add_income_column(df, logger, csv_file_path):
     """
-    Aggiunge la colonna del reddito complessivo per comune al dataframe metadata.
+    Adds a 'total_income' column to the dataframe based on municipal income data.
     
-    Args:
-        metadata_df: DataFrame con le colonne filename, feature, feature_index, coordinates, com_istat_code
-        income_csv_path: Path del file CSV contenente i dati del reddito
-    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        The existing dataframe with the 'com_istat_code' column
+    logger : logging.Logger
+        Logger to track executed steps
+    csv_file_path : str
+        Path to the CSV file containing municipal income data
+        
     Returns:
-        DataFrame con la nuova colonna 'total_income_per_municipality'
+    --------
+    pandas.DataFrame
+        The modified dataframe with the new 'total_income' column
     """
+    
+    logger.info("Starting process to add total income column")
     
     try:
-        income_df = pd.read_csv(income_csv_path, sep=';', encoding='utf-8')
-        logger.info(f"File CSV caricato con successo. Shape: {income_df.shape}")
+        # 1. Load the CSV with income data
+        logger.info(f"Loading income data from: {csv_file_path}")
+        # Use semicolon as separator based on the provided CSV format
+        income_df = pd.read_csv(csv_file_path, sep=';')
+        logger.info(f"Loaded {len(income_df)} rows from income CSV")
+        
+        # 2. Display available columns for debugging
+        logger.info(f"Available columns in CSV: {list(income_df.columns)}")
+        
+        # 3. Verify that required columns exist
+        required_columns = [ISTAT_CODE_COLUMN_CSV, INCOME_COLUMN_CSV]
+        missing_columns = [col for col in required_columns if col not in income_df.columns]
+        
+        if missing_columns:
+            logger.error(f"Missing columns in CSV: {missing_columns}")
+            logger.error(f"Available columns: {list(income_df.columns)}")
+            raise ValueError(f"CSV must contain columns: {required_columns}")
+        
+        logger.info("CSV column verification completed successfully")
+        
+        # 4. Verify that the required column exists in the main dataframe
+        if ISTAT_CODE_COLUMN_METADATA not in df.columns:
+            logger.error(f"Column '{ISTAT_CODE_COLUMN_METADATA}' not found in main dataframe")
+            logger.error(f"Available columns in main dataframe: {list(df.columns)}")
+            raise ValueError(f"Main dataframe must contain column: {ISTAT_CODE_COLUMN_METADATA}")
+        
+        # 5. Clean and standardize istat codes
+        # Ensure both codes are strings and have the same format
+        df[ISTAT_CODE_COLUMN_METADATA] = df[ISTAT_CODE_COLUMN_METADATA].astype(str).str.zfill(6)
+        income_df[ISTAT_CODE_COLUMN_CSV] = income_df[ISTAT_CODE_COLUMN_CSV].astype(str).str.zfill(6)
+        
+        logger.info("ISTAT code standardization completed")
+        
+        # 6. Create a mapping dictionary for more efficient lookup
+        income_mapping = dict(zip(
+            income_df[ISTAT_CODE_COLUMN_CSV], 
+            income_df[INCOME_COLUMN_CSV]
+        ))
+        
+        logger.info(f"Created mapping for {len(income_mapping)} municipalities")
+        
+        # 7. Add the income column using the mapping
+        df[NEW_COLUMN_NAME] = df[ISTAT_CODE_COLUMN_METADATA].map(income_mapping)
+        
+        # 8. Verify mapping results
+        matched_count = df[NEW_COLUMN_NAME].notna().sum()
+        total_count = len(df)
+        unmatched_count = total_count - matched_count
+        
+        logger.info(f"Mapping completed: {matched_count}/{total_count} rows matched")
+        
+        if unmatched_count > 0:
+            logger.warning(f"{unmatched_count} rows did not find a match")
+            unmatched_codes = df[df[NEW_COLUMN_NAME].isna()][ISTAT_CODE_COLUMN_METADATA].unique()
+            logger.warning(f"Unmatched ISTAT codes: {list(unmatched_codes)[:10]}...")  # show only first 10
+        
+        # 9. Statistics on added values
+        if matched_count > 0:
+            # Handle potential non-numeric values
+            numeric_income = pd.to_numeric(df[NEW_COLUMN_NAME], errors='coerce')
+            valid_income_count = numeric_income.notna().sum()
+            
+            if valid_income_count > 0:
+                min_income = numeric_income.min()
+                max_income = numeric_income.max()
+                mean_income = numeric_income.mean()
+                logger.info(f"Income statistics - Min: {min_income:.2f}, Max: {max_income:.2f}, Mean: {mean_income:.2f}")
+                logger.info(f"Valid numeric income values: {valid_income_count}/{matched_count}")
+            else:
+                logger.warning("No valid numeric income values found")
+        
+        logger.info("Process completed successfully")
+        return df
+        
+    except FileNotFoundError:
+        logger.error(f"CSV file not found: {csv_file_path}")
+        raise
+    except pd.errors.EmptyDataError:
+        logger.error("CSV file is empty")
+        raise
     except Exception as e:
-        logger.error(f"Errore nella lettura del file CSV: {e}")
-        return metadata_df
-    
-    istat_code_col = None
-    income_amount_col = None
-    
-    for col in income_df.columns:
-        col_lower = col.lower().strip()
-        if 'codice istat comune' in col_lower:
-            istat_code_col = col
-        elif 'reddito complessivo - ammontare in euro' in col_lower:
-            income_amount_col = col
-    
-    if istat_code_col is None:
-        logger.error("ERRORE: Colonna 'Codice Istat Comune' non trovata nel CSV")
-        return metadata_df
-    
-    if income_amount_col is None:
-        logger.error("ERRORE: Colonna 'Reddito complessivo - Ammontare in euro' non trovata nel CSV")
-        return metadata_df
-    
-    logger.info(f"Colonna codice ISTAT trovata: '{istat_code_col}'")
-    logger.info(f"Colonna reddito trovata: '{income_amount_col}'")
-    
-    # Seleziona solo le colonne necessarie
-    income_subset = income_df[[istat_code_col, income_amount_col]].copy()
-    
-    # Converti i codici ISTAT in string di 6 caratteri
-    income_subset[istat_code_col] = income_subset[istat_code_col].astype(str).str.zfill(6)
-    
-    # Gestisci i valori mancanti o non numerici nella colonna del reddito
-    income_subset[income_amount_col] = pd.to_numeric(income_subset[income_amount_col], errors='coerce')
-    
-    # Rimuovi le righe con valori mancanti
-    income_subset = income_subset.dropna()
-    
-    logger.info(f"Righe valide per l'aggregazione: {len(income_subset)}")
-    
-    # Aggrega i dati per codice ISTAT (somma i redditi per comune)
-    logger.info("Aggregazione dei dati per codice ISTAT...")
-    income_aggregated = income_subset.groupby(istat_code_col)[income_amount_col].sum().reset_index()
-    income_aggregated.columns = ['com_istat_code', 'total_income_per_municipality']
-    
-    # Converti anche la colonna com_istat_code del metadata in string
-    metadata_df = metadata_df.copy()
-    metadata_df['com_istat_code'] = metadata_df['com_istat_code'].astype(str)
-    
-    logger.info(f"Comuni unici nel dataset del reddito: {len(income_aggregated)}")
-    logger.info(f"Comuni unici nel metadata: {len(metadata_df['com_istat_code'].unique())}")
-    
-    # Merge dei dati
-    print("Unione dei dati...")
-    result_df = metadata_df.merge(
-        income_aggregated, 
-        on='com_istat_code', 
-        how='left'
-    )
-    
-    # Verifica quanti match sono stati trovati
-    matched_rows = result_df['total_income_per_municipality'].notna().sum()
-    total_rows = len(result_df)
-    
-    logger.info(f"Match trovati: {matched_rows}/{total_rows} righe ({matched_rows/total_rows*100:.1f}%)")
-    
-    # Mostra alcuni esempi di codici ISTAT che non hanno match
-    unmatched_codes = result_df[result_df['total_income_per_municipality'].isna()]['com_istat_code'].unique()
-    if len(unmatched_codes) > 0:
-        logger.warning(f"Esempi di codici ISTAT senza match: {unmatched_codes[:5]}")
-    
-    # Mostra statistiche della nuova colonna
-    if matched_rows > 0:
-        logger.info(f"\nStatistiche della colonna 'total_income_per_municipality':")
-        logger.info(f"Media: €{result_df['total_income_per_municipality'].mean():,.0f}")
-        logger.info(f"Mediana: €{result_df['total_income_per_municipality'].median():,.0f}")
-        logger.info(f"Min: €{result_df['total_income_per_municipality'].min():,.0f}")
-        logger.info(f"Max: €{result_df['total_income_per_municipality'].max():,.0f}")
-    
-    return result_df
+        logger.error(f"Error while adding income column: {str(e)}")
+        raise
 
 def main() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -578,12 +593,13 @@ def main() -> None:
         municipalities_file=MUNICIPALITIES_LIMIT_IT,
         logger=logger
     )
-    metadata = add_income_to_metadata(metadata, REDDITI_IRPEF_2023_IT, logger)
+    metadata = add_income_column(
+        df=metadata,
+        csv_file_path=REDDITI_IRPEF_2023_IT,
+        logger=logger
+    )
     metadata = assign_cluster_id(metadata, clusters)
     metadata = split_dataset(metadata)
-    pd.set_option('display.max_columns', None)
-    print(metadata.head())
-    return
     metadata = copy_images_to_output_path(metadata)
 
     save_to_parquet(metadata)
