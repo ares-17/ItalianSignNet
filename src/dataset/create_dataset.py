@@ -32,6 +32,7 @@ REDDITI_IRPEF_2023_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'Reddit
 ISTAT_CODE_COLUMN_METADATA = 'com_istat_code'
 ISTAT_CODE_COLUMN_CSV = 'Codice Istat Comune'
 INCOME_COLUMN_CSV = 'Reddito complessivo - Ammontare in euro'
+COUNT_PER_INCOME = 'Numero contribuenti'
 NEW_COLUMN_NAME = 'total_income'
 
 mlflow.set_tracking_uri('http://localhost:5000')
@@ -468,110 +469,29 @@ def define_logger():
     return logging.getLogger(__name__)
 
 def add_income_column(df, logger, csv_file_path):
-    """
-    Adds a 'total_income' column to the dataframe based on municipal income data.
-    
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        The existing dataframe with the 'com_istat_code' column
-    logger : logging.Logger
-        Logger to track executed steps
-    csv_file_path : str
-        Path to the CSV file containing municipal income data
-        
-    Returns:
-    --------
-    pandas.DataFrame
-        The modified dataframe with the new 'total_income' column
-    """
-    
     logger.info("Starting process to add total income column")
-    
+
     try:
-        # 1. Load the CSV with income data
-        logger.info(f"Loading income data from: {csv_file_path}")
-        # Use semicolon as separator based on the provided CSV format
         income_df = pd.read_csv(csv_file_path, sep=';')
         logger.info(f"Loaded {len(income_df)} rows from income CSV")
-        
-        # 2. Display available columns for debugging
-        logger.info(f"Available columns in CSV: {list(income_df.columns)}")
-        
-        # 3. Verify that required columns exist
-        required_columns = [ISTAT_CODE_COLUMN_CSV, INCOME_COLUMN_CSV]
-        missing_columns = [col for col in required_columns if col not in income_df.columns]
-        
-        if missing_columns:
-            logger.error(f"Missing columns in CSV: {missing_columns}")
-            logger.error(f"Available columns: {list(income_df.columns)}")
-            raise ValueError(f"CSV must contain columns: {required_columns}")
-        
-        logger.info("CSV column verification completed successfully")
-        
-        # 4. Verify that the required column exists in the main dataframe
-        if ISTAT_CODE_COLUMN_METADATA not in df.columns:
-            logger.error(f"Column '{ISTAT_CODE_COLUMN_METADATA}' not found in main dataframe")
-            logger.error(f"Available columns in main dataframe: {list(df.columns)}")
-            raise ValueError(f"Main dataframe must contain column: {ISTAT_CODE_COLUMN_METADATA}")
-        
-        # 5. Clean and standardize istat codes
-        # Ensure both codes are strings and have the same format
+
         df[ISTAT_CODE_COLUMN_METADATA] = df[ISTAT_CODE_COLUMN_METADATA].astype(str).str.zfill(6)
         income_df[ISTAT_CODE_COLUMN_CSV] = income_df[ISTAT_CODE_COLUMN_CSV].astype(str).str.zfill(6)
+
+        income_df['Reddito medio'] = income_df[INCOME_COLUMN_CSV] / income_df[COUNT_PER_INCOME]
         
-        logger.info("ISTAT code standardization completed")
-        
-        # 6. Create a mapping dictionary for more efficient lookup
-        income_mapping = dict(zip(
-            income_df[ISTAT_CODE_COLUMN_CSV], 
-            income_df[INCOME_COLUMN_CSV]
-        ))
-        
-        logger.info(f"Created mapping for {len(income_mapping)} municipalities")
-        
-        # 7. Add the income column using the mapping
+        income_mapping = dict(zip(income_df[ISTAT_CODE_COLUMN_CSV], income_df['Reddito medio']))
         df[NEW_COLUMN_NAME] = df[ISTAT_CODE_COLUMN_METADATA].map(income_mapping)
-        
-        # 8. Verify mapping results
-        matched_count = df[NEW_COLUMN_NAME].notna().sum()
-        total_count = len(df)
-        unmatched_count = total_count - matched_count
-        
-        logger.info(f"Mapping completed: {matched_count}/{total_count} rows matched")
-        
-        if unmatched_count > 0:
-            logger.warning(f"{unmatched_count} rows did not find a match")
-            unmatched_codes = df[df[NEW_COLUMN_NAME].isna()][ISTAT_CODE_COLUMN_METADATA].unique()
-            logger.warning(f"Unmatched ISTAT codes: {list(unmatched_codes)[:10]}...")  # show only first 10
-        
-        # 9. Statistics on added values
-        if matched_count > 0:
-            # Handle potential non-numeric values
-            numeric_income = pd.to_numeric(df[NEW_COLUMN_NAME], errors='coerce')
-            valid_income_count = numeric_income.notna().sum()
-            
-            if valid_income_count > 0:
-                min_income = numeric_income.min()
-                max_income = numeric_income.max()
-                mean_income = numeric_income.mean()
-                logger.info(f"Income statistics - Min: {min_income:.2f}, Max: {max_income:.2f}, Mean: {mean_income:.2f}")
-                logger.info(f"Valid numeric income values: {valid_income_count}/{matched_count}")
-            else:
-                logger.warning("No valid numeric income values found")
-        
-        logger.info("Process completed successfully")
+
+        df['income_quartile'] = pd.qcut(df[NEW_COLUMN_NAME], q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
+
+        logger.info("Successfully added income column and quartile classification.")
         return df
-        
-    except FileNotFoundError:
-        logger.error(f"CSV file not found: {csv_file_path}")
-        raise
-    except pd.errors.EmptyDataError:
-        logger.error("CSV file is empty")
-        raise
+
     except Exception as e:
         logger.error(f"Error while adding income column: {str(e)}")
         raise
+
 
 def main() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
