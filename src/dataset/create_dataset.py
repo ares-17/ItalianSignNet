@@ -35,8 +35,6 @@ INCOME_COLUMN_CSV = 'Reddito complessivo - Ammontare in euro'
 COUNT_PER_INCOME = 'Numero contribuenti'
 NEW_COLUMN_NAME = 'total_income'
 
-mlflow.set_tracking_uri('http://localhost:5000')
-
 def get_latest_json() -> str:
     logs_dir = os.path.join(BASE_DIR or '', 'src', 'dataset', 'logs')
     json_files = [
@@ -50,8 +48,6 @@ def get_latest_json() -> str:
     latest_json = sorted(json_files)[-1]
     json_path = os.path.join(logs_dir, latest_json)
     return json_path
-
-CLUSTER_JSON_PATH = get_latest_json()
 
 def assign_cluster_id(metadata: pd.DataFrame, clusters: dict) -> pd.DataFrame:
     """
@@ -238,7 +234,7 @@ def df_add_label_index_column(metadata: pd.DataFrame) -> pd.DataFrame:
 
     return metadata
 
-def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict) -> None:
+def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict, cluster_json_path: str) -> None:
     """
     Log dataset information to MLflow with enhanced tracking capabilities.
     
@@ -290,10 +286,10 @@ def log_dataset_info(metadata: pd.DataFrame, cluster_report: dict) -> None:
             "version": 0.1,
             "eps": DBSCAN_DISTANCE,
             "folder": os.getenv("TEST_CASE_BASE_ROOT"),
-            "json_spatial_clustering": CLUSTER_JSON_PATH
+            "json_spatial_clustering": cluster_json_path
         })
 
-        mlflow.log_artifact(CLUSTER_JSON_PATH)
+        mlflow.log_artifact(cluster_json_path)
 
 def parse_coordinates(coord_string: str) -> Optional[Tuple[float, float]]:
     """
@@ -492,13 +488,14 @@ def add_income_column(df, logger, csv_file_path):
         logger.error(f"Error while adding income column: {str(e)}")
         raise
 
-
 def main() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     logger = define_logger()
     
-    with open(CLUSTER_JSON_PATH) as f:
+    cluster_json_path = get_latest_json()
+
+    with open(cluster_json_path) as f:
         clustersInfo: dict = json.load(f)
     
     create_folder_sets()
@@ -523,7 +520,7 @@ def main() -> None:
     metadata = copy_images_to_output_path(metadata)
 
     save_to_parquet(metadata)
-    log_dataset_info(metadata, clustersInfo['report'])
+    log_dataset_info(metadata, clustersInfo['report'], cluster_json_path)
 
 if __name__ == "__main__":
     main()

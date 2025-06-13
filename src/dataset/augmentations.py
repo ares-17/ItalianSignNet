@@ -5,11 +5,14 @@ import pandas as pd
 import albumentations as A
 import random
 import logging
-from pathlib import Path
 from tqdm import tqdm
 from dotenv import load_dotenv
 from datetime import datetime
+from pathlib import Path
 
+load_dotenv()
+BASE_DIR = os.getenv("BASE_DIR") or ''
+DATASET = Path(BASE_DIR, 'src', 'dataset', 'artifacts', os.path.join(os.getenv("DATASET") or ''))
 SEED = 42
 PHOTO_PERCENT = 0.10
 ATMOSPHERIC_PERCENT = 0.15
@@ -28,13 +31,6 @@ def define_logger():
         handlers=[logging.FileHandler(log_filename), logging.StreamHandler()]
     )
     return logging.getLogger(__name__)
-
-def load_config():
-    load_dotenv()
-    base_dir = os.getenv("BASE_DIR_DATASET")
-    if not base_dir:
-        raise ValueError("BASE_DIR_DATASET non definita nel file .env")
-    return Path(base_dir)
 
 def get_transforms():
     photo_transform = A.Compose([
@@ -111,7 +107,7 @@ def apply_and_save_transform(images, transform, label, logger, metadata_df):
     for img_path in tqdm(images, desc=f"Applying {label}"):
         img = cv2.imread(str(img_path))
         if img is None:
-            logger.warning(f"Immagine non trovata o illeggibile: {img_path}")
+            logger.warning(f"Image not found: {img_path}")
             continue
 
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -131,35 +127,14 @@ def apply_and_save_transform(images, transform, label, logger, metadata_df):
             if not original_row.empty:
                 new_row = original_row.iloc[0].copy()
                 new_row["filename"] = new_filename
+                new_row["generated"] = True
                 new_rows.append(new_row)
         else:
-            logger.error(f"Errore nel salvataggio di: {new_path}")
+            logger.error(f"Error during save: {new_path}")
 
     return new_rows
 
-def main():
-    logger = define_logger()
-    base_dir = load_config()
-    train_dir = base_dir / "train"
-    metadata_path = base_dir / "metadata.parquet"
-
-    random.seed(SEED)
-    np.random.seed(SEED)
-
-    logger.info(f"Caricamento metadata da {metadata_path}")
-    metadata = pd.read_parquet(metadata_path)
-
-    all_images = get_image_list(train_dir)
-    logger.info(f"Trovate {len(all_images)} immagini totali")
-
-    photo_transform, atmospheric_transform, occlusion_transform = get_transforms()
-    photo_imgs, atm_imgs, occlusion_imgs = sample_images(all_images)
-
-    new_metadata_rows = []
-    new_metadata_rows += apply_and_save_transform(photo_imgs, photo_transform, "Photometric", logger, metadata)
-    new_metadata_rows += apply_and_save_transform(atm_imgs, atmospheric_transform, "Atmospheric", logger, metadata)
-    new_metadata_rows += apply_and_save_transform(occlusion_imgs, occlusion_transform, "Occlusion", logger, metadata)
-
+def save_new_metadata_rows(new_metadata_rows: list, metadata: pd.DataFrame, logger: logging.Logger, metadata_path: str):
     if new_metadata_rows:
         logger.info(f"Aggiunte {len(new_metadata_rows)} nuove righe al metadata")
         augmented_df = pd.DataFrame(new_metadata_rows)
@@ -168,6 +143,34 @@ def main():
         logger.info(f"Metadata aggiornato salvato in {metadata_path}")
     else:
         logger.info("Nessuna nuova immagine generata.")
+
+def apply_trasform_and_save_metadata(all_images: list, logger: logging.Logger, metadata: pd.DataFrame, metadata_path: str):
+    photo_transform, atmospheric_transform, occlusion_transform = get_transforms()
+    photo_imgs, atm_imgs, occlusion_imgs = sample_images(all_images)
+
+    new_metadata_rows = []
+    new_metadata_rows += apply_and_save_transform(photo_imgs, photo_transform, "Photometric", logger, metadata)
+    new_metadata_rows += apply_and_save_transform(atm_imgs, atmospheric_transform, "Atmospheric", logger, metadata)
+    new_metadata_rows += apply_and_save_transform(occlusion_imgs, occlusion_transform, "Occlusion", logger, metadata)
+
+    save_new_metadata_rows(new_metadata_rows, metadata, logger, metadata_path)
+
+def main():
+    logger = define_logger()
+    train_dir = Path(os.path.join(DATASET or '', "train"))
+    metadata_path = os.path.join(DATASET or '', "metadata.parquet")
+
+    random.seed(SEED)
+    np.random.seed(SEED)
+
+    logger.info(f"Loading metadata at {metadata_path}")
+    metadata = pd.read_parquet(metadata_path)
+    metadata["generated"] = False
+
+    all_images = get_image_list(train_dir)
+    logger.info(f"Found {len(all_images)} total images")
+
+    apply_trasform_and_save_metadata(all_images, logger, metadata, metadata_path)
 
 if __name__ == "__main__":
     main()

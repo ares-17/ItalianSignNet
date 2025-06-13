@@ -1,5 +1,7 @@
 services:  
   mlflow:
+    # only for testing purpose: with root user mlflow is enable to write in mlflow_data folder 
+    user: root
     build:
       context: .
       dockerfile: Dockerfile.mlflow
