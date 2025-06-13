@@ -12,7 +12,7 @@ sys.path.append(utils_path)
 import dataminer.utility as utility
 
 load_dotenv()
-BASE_DIR = Path(os.getenv("BASE_DIR"))
+BASE_DIR = Path(os.getenv("BASE_DIR") or '')
 
 # Boolean options
 MERGE_FULLSIZE_IMAGES = os.getenv("MERGE_FULLSIZE_IMAGES", "false").lower() in ("true", "1", "yes")
@@ -84,7 +84,7 @@ def merge_test_data_folders(input_folders, input_directory, output_folder):
 
 
 
-def list_available_folders(directory="."):
+def list_available_folders(directory: Path):
     folders = [f for f in os.listdir(directory) if os.path.isdir(os.path.join(directory, f))]
     return folders
 
