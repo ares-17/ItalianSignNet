@@ -7,9 +7,9 @@ import augmentations
 import requests
 from requests.exceptions import RequestException
 
-def check_mlflow_running(port=5000):
+def check_mlflow_running(mlflow_endpoint: str | None):
     try:
-        response = requests.get(f"http://localhost:{port}")
+        response = requests.get(mlflow_endpoint if mlflow_endpoint else "http://localhost:5000")
         if response.status_code == 200:
             return True
         else:
@@ -20,9 +20,10 @@ def check_mlflow_running(port=5000):
 
 def main():
     load_dotenv()
+    mlflow_endpoint = os.getenv("MLFLOW_ENDPOINT", None)
     apply_augmentations = os.getenv("APPLY_AUGMENTATIONS", True)
 
-    if not check_mlflow_running():
+    if not check_mlflow_running(mlflow_endpoint):
         print("Interrupting execution: MlFlow is not running")
         return
 
