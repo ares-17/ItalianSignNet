@@ -9,10 +9,10 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from datetime import datetime
 from pathlib import Path
+import glob
 
 load_dotenv()
 BASE_DIR = os.getenv("BASE_DIR") or ''
-DATASET = Path(BASE_DIR, 'src', 'dataset', 'artifacts', os.path.join(os.getenv("DATASET") or ''))
 SEED = 42
 PHOTO_PERCENT = 0.10
 ATMOSPHERIC_PERCENT = 0.15
@@ -155,10 +155,25 @@ def apply_trasform_and_save_metadata(all_images: list, logger: logging.Logger, m
 
     save_new_metadata_rows(new_metadata_rows, metadata, logger, metadata_path)
 
-def main():
+def get_input_dataset_or_latest(dataset_name=None) -> str:
+    base_dir_dataset = Path(BASE_DIR, 'src', 'dataset', 'artifacts')
+
+    if dataset_name:
+        return os.path.join(base_dir_dataset, dataset_name)
+
+    dataset_folders = glob.glob(os.path.join(base_dir_dataset, "dataset_*"))
+    if not dataset_folders:
+        raise FileNotFoundError("Nessun dataset trovato")
+
+    dataset_folders.sort(reverse=True)
+    return dataset_folders[0]
+
+def main(dataset_name=None):
     logger = define_logger()
-    train_dir = Path(os.path.join(DATASET or '', "train"))
-    metadata_path = os.path.join(DATASET or '', "metadata.parquet")
+
+    dataset = get_input_dataset_or_latest(dataset_name)
+    train_dir = Path(os.path.join(dataset, "train"))
+    metadata_path = os.path.join(dataset, "metadata.parquet")
 
     random.seed(SEED)
     np.random.seed(SEED)

@@ -118,17 +118,22 @@ def labels_by_bar_graph(report_data):
         plt.savefig(clusters_per_label_file, dpi=300)
         plt.close()
 
-def get_dbscan_file_name():
-    dbscan_file = input("Inserisci il nome del file JSON da leggere dalla cartella logs (es. dbscan_clusters_20250320_193435_eps_100.json): ").strip()
-    if not dbscan_file:
-        print("Errore: devi specificare il nome del file JSON da leggere.")
-        exit(1)
-    
+def get_dbscan_file_name(dbscan_file_name=None):
     logs_dir = os.path.join(script_dir, "logs")
-    return os.path.join(logs_dir, dbscan_file)
 
-def main():
-    json_file = get_dbscan_file_name()
+    if dbscan_file_name:
+        return os.path.join(logs_dir, dbscan_file_name)
+
+    json_files = glob.glob(os.path.join(logs_dir, "spatial_clustering_*.json"))
+    if not json_files:
+        raise FileNotFoundError("Nessun file JSON trovato nella cartella 'logs/'.")
+
+    json_files.sort(reverse=True)
+    return json_files[0]
+
+
+def main(dbscan_file_name = None):
+    json_file = get_dbscan_file_name(dbscan_file_name)
     os.makedirs(reports_dir, exist_ok=True)
 
     with open(json_file, "r") as f:
