@@ -28,11 +28,11 @@ def main():
 
     spatial_clustering.main()
     create_dataset.main()
-    dbscan_reports.main()
     
     if apply_augmentations:
         augmentations.main()
-
+    
+    dbscan_reports.main()
 
 if __name__ == "__main__":
     main()

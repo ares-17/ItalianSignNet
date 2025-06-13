@@ -24,16 +24,19 @@ BASE_DIR = os.getenv("BASE_DIR")
 DATA_SOURCE_ROOT = os.path.join(BASE_DIR or '', os.getenv("TEST_CASE_BASE_ROOT") or '')
 DBSCAN_DISTANCE = int(os.getenv("DBSCAN_DISTANCE", 100))
 OUTPUT_DIR = os.path.join(BASE_DIR or '', 'src', 'dataset', 'artifacts', f'dataset_{TIMESTAMP}_eps_{DBSCAN_DISTANCE}')
+
+# files
 LABEL_INDEX_FILE = os.path.join(BASE_DIR or '', 'src', 'utils', 'signnames.csv')
 MUNICIPALITIES_LIMIT_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'limits_IT_municipalities.geojson')
 REGIONS_LIMIT_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'limits_IT_regions.geojson')
-REDDITI_IRPEF_2023_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'Redditi_e_principali_variabili_IRPEF_su_base_comunale_CSV_2023.csv')
+REDDITI_IRPEF_IT = os.path.join(BASE_DIR or '', 'src', 'resources', 'Redditi_e_principali_variabili_IRPEF_su_base_comunale_CSV_2023.csv')
 
+# IRPEF INCOME COLUMNS
 ISTAT_CODE_COLUMN_METADATA = 'com_istat_code'
 ISTAT_CODE_COLUMN_CSV = 'Codice Istat Comune'
 INCOME_COLUMN_CSV = 'Reddito complessivo - Ammontare in euro'
 COUNT_PER_INCOME = 'Numero contribuenti'
-NEW_COLUMN_NAME = 'total_income'
+COLUMN_AVERAGE_INCOME = 'average_income'
 
 def get_latest_json() -> str:
     logs_dir = os.path.join(BASE_DIR or '', 'src', 'dataset', 'logs')
@@ -175,7 +178,7 @@ def split_dataset(metadata: pd.DataFrame) -> pd.DataFrame:
         'test': val_test_cluster_labels_normalized.iloc[test_idx]['cluster_id']
     }
 
-    metadata['split'] = 'train'
+    metadata.loc[:, 'split'] = 'train'
     for split_name, clusters in splits.items():
         metadata.loc[metadata['cluster_id'].isin(clusters), 'split'] = split_name
 
@@ -477,9 +480,9 @@ def add_income_column(df, logger, csv_file_path):
         income_df['Reddito medio'] = income_df[INCOME_COLUMN_CSV] / income_df[COUNT_PER_INCOME]
         
         income_mapping = dict(zip(income_df[ISTAT_CODE_COLUMN_CSV], income_df['Reddito medio']))
-        df[NEW_COLUMN_NAME] = df[ISTAT_CODE_COLUMN_METADATA].map(income_mapping)
+        df[COLUMN_AVERAGE_INCOME] = df[ISTAT_CODE_COLUMN_METADATA].map(income_mapping)
 
-        df['income_quartile'] = pd.qcut(df[NEW_COLUMN_NAME], q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
+        df['income_quartile'] = pd.qcut(df[COLUMN_AVERAGE_INCOME], q=4, labels=['Q1', 'Q2', 'Q3', 'Q4'])
 
         logger.info("Successfully added income column and quartile classification.")
         return df
@@ -512,7 +515,7 @@ def main() -> None:
     )
     metadata = add_income_column(
         df=metadata,
-        csv_file_path=REDDITI_IRPEF_2023_IT,
+        csv_file_path=REDDITI_IRPEF_IT,
         logger=logger
     )
     metadata = assign_cluster_id(metadata, clusters)
