@@ -165,4 +165,5 @@ mlartifacts
 *.weights.h5
 
 mlflow_data/*
+notebook-workspace
 !mlflow_data/README.md
