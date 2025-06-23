@@ -15,7 +15,7 @@ def check_mlflow_running(mlflow_endpoint: str | None):
         else:
             return False
     except RequestException as e:
-        print(f"MLFlow error on {port}: {e}")
+        print(f"MLFlow error: {e}")
         return False
 
 def main():

@@ -32,9 +32,6 @@ def plot_heatmap(cluster_centers):
         lons = cluster_centers['lon']
         lats = cluster_centers['lat']
         
-        # CORREZIONE: inverti l'ordine del bounding box se necessario
-        # Formato corretto: (lat_min, lon_min, lat_max, lon_max)
-        # Oppure: (y_min, x_min, y_max, x_max)
         hb = plt.hexbin(lats, lons, gridsize=50,
                         extent=(ITALY_HEATMAP_BBOX[1], ITALY_HEATMAP_BBOX[3],  # xmin, xmax (lon)
                                ITALY_HEATMAP_BBOX[0], ITALY_HEATMAP_BBOX[2]),  # ymin, ymax (lat)
@@ -46,7 +43,6 @@ def plot_heatmap(cluster_centers):
     plt.xlabel("Longitudine")
     plt.ylabel("Latitudine")
     
-    # Imposta i limiti corretti basati sui dati o sul bbox
     plt.xlim(6, 19)  # Longitudine approssimativa Italia
     plt.ylim(36, 48)  # Latitudine approssimativa Italia
     
@@ -109,12 +105,13 @@ def plot_income_quartile_distribution(df):
     plt.close()
 
 def plot_features_by_quartile(df):
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(10, 6))
     pd.crosstab(df['feature'], df['income_quartile']).plot(kind='bar', stacked=True)
     plt.title("Distribuzione delle feature per quartile di reddito")
     plt.xlabel("Feature")
     plt.ylabel("Conteggio")
     plt.xticks(rotation=45, ha="right")
+    plt.xticks(fontsize=7)
     plt.tight_layout()
     plt.savefig(os.path.join(reports_dir, f"features_by_quartile_{timestamp_str}.png"), dpi=300)
     plt.close()
