@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime
 import pandas as pd
 import glob
+import seaborn as sns
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 reports_dir = os.path.join(script_dir, "reports")
@@ -85,25 +86,6 @@ def get_input_dataset_or_latest(dataset_name=None) -> str:
     dataset_folders.sort(reverse=True)
     return dataset_folders[0]
 
-def plot_income_quartile_distribution(df):
-    plt.figure(figsize=(12, 8))
-    
-    for quartile in sorted(df['income_quartile'].unique()):
-        subset = df[df['income_quartile'] == quartile]
-        plt.scatter(subset['lon'], subset['lat'], 
-                   alpha=0.5, label=f'Q{quartile}', 
-                   s=10)  # s controlla la dimensione dei punti
-    
-    plt.title("Distribuzione spaziale per quartile di reddito")
-    plt.xlabel("Longitudine")
-    plt.ylabel("Latitudine")
-    plt.legend(title="Quartile")
-    plt.xlim(ITALY_HEATMAP_BBOX[1], ITALY_HEATMAP_BBOX[3])  # Coordinate approssimative Italia
-    plt.ylim(ITALY_HEATMAP_BBOX[0], ITALY_HEATMAP_BBOX[2])
-    plt.grid(True, alpha=0.3)
-    plt.savefig(os.path.join(reports_dir, f"income_quartile_distribution_{timestamp_str}.png"), dpi=300)
-    plt.close()
-
 def plot_features_by_quartile(df):
     plt.figure(figsize=(10, 6))
     pd.crosstab(df['feature'], df['income_quartile']).plot(kind='bar', stacked=True)
@@ -116,46 +98,42 @@ def plot_features_by_quartile(df):
     plt.savefig(os.path.join(reports_dir, f"features_by_quartile_{timestamp_str}.png"), dpi=300)
     plt.close()
 
-def add_geographic_location(df):
-    """Aggiunge una colonna 'geographic_location' basata sulla latitudine"""
-    df['geographic_location'] = 'centro'  # Valore di default
-    
-    # Sud: latitudine < 41.55947
-    df.loc[df['lon'] < 41.5594700, 'geographic_location'] = 'sud'
-    
-    # Nord: latitudine > 44.801485
-    df.loc[df['lon'] > 44.801485, 'geographic_location'] = 'nord'
-    
-    return df
 
+import matplotlib.pyplot as plt
 import seaborn as sns
+import os
 
 def plot_quartile_counts_by_area(df):
     plt.figure(figsize=(10, 6))
     
-    # Crea un countplot con hue per i quartili
-    ax = sns.countplot(data=df, 
-                       x='geographic_location', 
-                       hue='income_quartile',
-                       order=['nord', 'centro', 'sud'],  # Ordine logico N→S
-                       palette='viridis')  # Scala di colori
+    ax = sns.countplot(
+        data=df, 
+        x='area', 
+        hue='income_quartile',
+        order=['nord', 'centre', 'sud'],             # Ordine macro-aree N→S
+        hue_order=['Q1', 'Q2', 'Q3', 'Q4'],          # Ordine quartili Q1→Q4
+        palette='Set2'                               # Colori vivaci
+    )
     
     plt.title('Conteggio dei quartili di reddito per macro-area')
     plt.xlabel('Macro-area')
     plt.ylabel('Conteggio')
     plt.legend(title='Quartile', bbox_to_anchor=(1.05, 1), loc='upper left')
     
-    # Aggiungi le etichette con i valori sopra ogni barra
+    # Etichette sopra le barre
     for p in ax.patches:
-        ax.annotate(f'{int(p.get_height())}', 
-                   (p.get_x() + p.get_width() / 2., p.get_height()), 
-                   ha='center', va='center', 
-                   xytext=(0, 5), 
-                   textcoords='offset points')
+        height = p.get_height()
+        if height > 0:
+            ax.annotate(f'{int(height)}', 
+                        (p.get_x() + p.get_width() / 2., height), 
+                        ha='center', va='center', 
+                        xytext=(0, 5), 
+                        textcoords='offset points')
     
     plt.tight_layout()
     plt.savefig(os.path.join(reports_dir, f"quartile_counts_by_area_{timestamp_str}.png"), dpi=300)
     plt.close()
+
 
 def main(dataset_name = None):
 
@@ -166,8 +144,6 @@ def main(dataset_name = None):
     plot_heatmap(cluster_centers)
     plot_cluster_cardinality(df)
     plot_clusters_per_label(df)
-    #plot_income_quartile_distribution(df)
-    df = add_geographic_location(df)
     plot_quartile_counts_by_area(df)
     plot_features_by_quartile(df)
 
