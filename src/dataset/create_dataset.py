@@ -77,10 +77,6 @@ def save_to_parquet(metadata: pd.DataFrame) -> None:
     output_path = os.path.join(OUTPUT_DIR, "metadata.parquet")
     metadata.to_parquet(output_path)
 
-def sanitize_param_name(name: str) -> str:
-    """Sostituisce caratteri non validi con underscore"""
-    return name.lower().replace('(', '_').replace(')', '_').replace('/', '_').replace(' ', '_')
-
 def precreate_class_folders(split: str, base_dir: str) -> None:
     """
     Crea preventivamente tutte le cartelle delle classi per ogni split.
@@ -184,15 +180,6 @@ def split_dataset(metadata: pd.DataFrame) -> pd.DataFrame:
         metadata.loc[metadata['cluster_id'].isin(clusters), 'split'] = split_name
 
     return metadata
-
-def verify_splits(metadata):
-    return (
-        metadata
-        .groupby(['split', 'feature_index'])
-        .size()
-        .unstack()
-        .apply(lambda x: x/x.sum(), axis=1)
-    )
 
 def copy_images_to_output_path(metadata: pd.DataFrame) -> pd.DataFrame:
     """
@@ -319,72 +306,6 @@ def parse_coordinates(coord_string: str) -> Optional[Tuple[float, float]]:
     except (ValueError, AttributeError) as e:
         logging.warning(f"Failed to parse coordinates '{coord_string}': {e}")
         return None
-
-def add_municipality_codes_to_dataframe(
-    df: pd.DataFrame, 
-    regions_file: str, 
-    municipalities_file: str,
-    coordinates_column: str = 'coordinates',
-    output_column: str = 'com_istat_code',
-    logger: Optional[logging.Logger] = None
-) -> pd.DataFrame:
-    """
-    Add municipality ISTAT codes to a DataFrame based on coordinates.
-    
-    Args:
-        df: Input DataFrame with coordinates
-        regions_file: Path to regions GeoJSON file
-        municipalities_file: Path to municipalities GeoJSON file
-        coordinates_column: Name of the column containing coordinates (default: 'coordinates')
-        output_column: Name of the output column for ISTAT codes (default: 'com_istat_code')
-        logger: Optional logger instance
-        
-    Returns:
-        DataFrame with added municipality codes column
-    """
-    if logger is None:
-        logger = logging.getLogger(__name__)
-    
-    # Create a copy to avoid modifying the original DataFrame
-    result_df = df.copy()
-    
-    # Initialize the geocoder
-    logger.info("Initializing municipal geocoder...")
-    geocoder = MunicipalGeocoder(regions_file, municipalities_file, logger)
-    
-    # Check if coordinates column exists
-    if coordinates_column not in df.columns:
-        raise ValueError(f"Column '{coordinates_column}' not found in DataFrame")
-    
-    # Parse coordinates and geocode
-    logger.info(f"Processing {len(df)} rows...")
-    municipality_codes = []
-    successful_geocodings = 0
-    
-    for idx, coord_string in enumerate(df[coordinates_column]):
-        if idx % 100 == 0 and idx > 0:
-            logger.info(f"Processed {idx}/{len(df)} rows...")
-        
-        # Parse coordinates
-        coords = parse_coordinates(coord_string)
-        if coords is None:
-            municipality_codes.append(None)
-            continue
-        
-        lat, lon = coords
-        
-        # Geocode
-        result = geocoder.geocode(lat, lon)
-        if result:
-            municipality_codes.append(result['com_istat_code'])
-            successful_geocodings += 1
-        else:
-            municipality_codes.append(None)
-    
-    result_df[output_column] = municipality_codes
-    logger.info(f"Geocoding completed: {successful_geocodings}/{len(df)} coordinates successfully geocoded")
-    
-    return result_df
 
 def add_municipality_codes_batch(
     df: pd.DataFrame, 
@@ -592,9 +513,7 @@ def main() -> None:
         output_column='area',
     )
 
-    pd.set_option('display.max_columns', None)
-    print(metadata.head())
-    #metadata = copy_images_to_output_path(metadata)
+    metadata = copy_images_to_output_path(metadata)
     save_to_parquet(metadata)
     log_dataset_info(metadata, clustersInfo['report'], cluster_json_path)
 
