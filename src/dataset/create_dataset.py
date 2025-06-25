@@ -16,6 +16,7 @@ utils_path = os.path.join(os.path.dirname(__file__), "..")
 sys.path.append(utils_path)
 
 from utils.MunicipalGeocoder import MunicipalGeocoder
+from utils.RegionGeocoder import RegionGeocoder
 
 TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -491,6 +492,69 @@ def add_income_column(df, logger, csv_file_path):
         logger.error(f"Error while adding income column: {str(e)}")
         raise
 
+def add_macro_area_column(
+    df: pd.DataFrame, 
+    regions_file: str,
+    coordinates_column: str = 'coordinates',
+    output_column: str = 'area',
+    logger: Optional[logging.Logger] = None
+) -> pd.DataFrame:
+    """
+    Aggiunge una colonna 'area' al DataFrame con il valore 'nord', 'centre' o 'sud',
+    calcolato a partire dalle coordinate di ciascuna riga usando RegionGeocoder.
+    
+    Args:
+        df: DataFrame in ingresso contenente una colonna di coordinate
+        regions_file: Path al file GeoJSON delle regioni italiane
+        coordinates_column: Nome della colonna con le coordinate (formato stringa)
+        output_column: Nome della colonna di output da creare (default: 'area')
+        logger: Logger opzionale
+
+    Returns:
+        DataFrame con la colonna 'area' aggiunta
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+    
+    logger.info("Inizializzazione RegionGeocoder...")
+    geocoder = RegionGeocoder(regions_file, logger)
+
+    if coordinates_column not in df.columns:
+        raise ValueError(f"La colonna '{coordinates_column}' non è presente nel DataFrame.")
+    
+    # Prepara coordinate valide
+    coordinate_tuples = []
+    valid_indices = []
+    logger.info("Parsing coordinate valide...")
+    for idx, coord_string in enumerate(df[coordinates_column]):
+        coords = parse_coordinates(coord_string)
+        if coords is not None:
+            coordinate_tuples.append(coords)
+            valid_indices.append(idx)
+
+    logger.info(f"Trovate {len(coordinate_tuples)} coordinate valide su {len(df)} righe.")
+
+    # Batch geocoding
+    logger.info("Esecuzione batch geocoding...")
+    geocoding_results = geocoder.geocode_batch(coordinate_tuples)
+
+    # Inizializza la nuova colonna
+    macro_areas = [None] * len(df)
+    successful = 0
+
+    for i, result in enumerate(geocoding_results):
+        original_idx = valid_indices[i]
+        if result and result.get("macro_area"):
+            macro_areas[original_idx] = result["macro_area"]
+            successful += 1
+
+    logger.info(f"Macro-area assegnata con successo a {successful}/{len(coordinate_tuples)} righe.")
+
+    result_df = df.copy()
+    result_df[output_column] = macro_areas
+
+    return result_df
+
 def main() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -520,8 +584,17 @@ def main() -> None:
     )
     metadata = assign_cluster_id(metadata, clusters)
     metadata = split_dataset(metadata)
-    metadata = copy_images_to_output_path(metadata)
+    metadata = add_macro_area_column(
+        df=metadata,
+        regions_file=REGIONS_LIMIT_IT,
+        coordinates_column='coordinates',
+        logger=logger,
+        output_column='area',
+    )
 
+    pd.set_option('display.max_columns', None)
+    print(metadata.head())
+    #metadata = copy_images_to_output_path(metadata)
     save_to_parquet(metadata)
     log_dataset_info(metadata, clustersInfo['report'], cluster_json_path)
 
