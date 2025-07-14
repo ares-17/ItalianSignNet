@@ -136,7 +136,11 @@ def plot_quartile_counts_by_area(df):
 
 
 def main(dataset_name = None):
-
+    """
+    Funzione principale. Può essere richiamata da script esterni oppure da riga di comando.
+    
+    :param dataset_name: Nome della cartella del dataset (es: 'dataset_20240624') oppure None per usare l'ultimo disponibile.
+    """
     dataset_dir = get_input_dataset_or_latest(dataset_name)
     df = load_data(os.path.join(dataset_dir, 'metadata.parquet'))
     cluster_centers = compute_cluster_centers(df)
@@ -147,5 +151,17 @@ def main(dataset_name = None):
     plot_quartile_counts_by_area(df)
     plot_features_by_quartile(df)
 
+# Permette esecuzione diretta da terminale con argparse
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Genera report grafici per un dataset di clustering.")
+    parser.add_argument(
+        "--dataset", 
+        type=str, 
+        help="Nome della cartella del dataset (es. 'dataset_20240624'). Se omesso, usa il più recente.",
+        default=None
+    )
+    args = parser.parse_args()
+    main(dataset_name=args.dataset)
+

@@ -14,11 +14,15 @@ class RegionGeocoder:
     https://www.agenziacoesione.gov.it/sistema-conti-pubblici-territoriali/il-sistema-cpt/metodologia/
     """
 
+    """
+    I nomi seguono la convenzione dei dati censiti in:
+    https://github.com/openpolis/geojson-italy/blob/master/geojson/limits_IT_regions.geojson
+    """
     MACRO_AREA_MAP = {
         # Nord
-        'Piemonte':'nord', "Regione Valle d'Aosta/Vallée d'Aoste":'nord',
+        'Piemonte':'nord', "Valle d'Aosta/Vallée d'Aoste":'nord',
         'Liguria':'nord', 'Lombardia':'nord',
-        'Trentino-Alto Adige':'nord', 'Veneto':'nord',
+        'Trentino-Alto Adige/Südtirol':'nord', 'Veneto':'nord',
         'Friuli-Venezia Giulia':'nord', 'Emilia-Romagna':'nord',
         # Centro
         'Toscana':'centre', 'Marche':'centre',
@@ -65,11 +69,16 @@ class RegionGeocoder:
         """
         Geocode coordinate → ritorna {
             'reg_istat_code', 'reg_name', 'macro_area'
-        } oppure None se fuori dall'Italia.
+        } oppure, se non matcha, assegna la regione più vicina.
         """
         pt = Point(longitude, latitude)
+        closest_region = None
+        min_dist = float('inf')
+        closest_code = None
+
         for code, region in self.regions.items():
-            if region['prepared'].contains(pt):
+            geom = region['geometry']
+            if region['prepared'].intersects(pt):
                 name = region['name']
                 macro = self.MACRO_AREA_MAP.get(name)
                 if macro is None:
@@ -79,8 +88,32 @@ class RegionGeocoder:
                     'reg_name': name,
                     'macro_area': macro
                 }
-        self.logger.warning(f"Coordinate ({latitude},{longitude}) fuori dai confini regionali")
+
+            # Calcolo distanza al poligono
+            dist = geom.distance(pt)
+            if dist < min_dist:
+                min_dist = dist
+                closest_region = region
+                closest_code = code
+
+        # Fallback: regione più vicina
+        if closest_region:
+            name = closest_region['name']
+            macro = self.MACRO_AREA_MAP.get(name)
+            self.logger.warning(
+                f"Coordinate ({latitude},{longitude}) non interne a nessuna regione. "
+                f"Assegnata regione più vicina: '{name}' (distanza {min_dist:.6f})"
+            )
+            return {
+                'reg_istat_code': closest_code,
+                'reg_name': name,
+                'macro_area': macro
+            }
+
+        # Se non trova nemmeno la più vicina (cosa impossibile se dati validi)
+        self.logger.error(f"Coordinate ({latitude},{longitude}) non assegnabili a nessuna regione nemmeno per prossimità.")
         return None
+
 
     def geocode_batch(self, coords: List[Tuple[float, float]]) -> List[Optional[Dict[str, Any]]]:
         return [self.geocode(lat, lon) for lat, lon in coords]
