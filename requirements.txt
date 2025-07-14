@@ -1,30 +1,30 @@
-# Geospatial
+# --- Geospatial ---
 geojson==3.1.0
 mapbox-vector-tile==1.2.1
 geopy==2.4.1
 vt2geojson==0.2.1
-shapely==2.0.2  # Libreria per operazioni geometriche
+shapely==2.0.2
 folium==0.19.4
 
-# Computer Vision & ML
-opencv-python-headless==4.9.0.80
-tensorflow==2.16.1
+# --- Data manipulation ---
 pandas==2.2.3
+numpy==1.26.4
+scikit-learn==1.6.1
+seaborn==0.13.2
 
-# Utilities & Networking
-requests==2.31.0
-protobuf==3.20.3
+# --- Deep Learning & Computer Vision ---
+tensorflow==2.16.1
+opencv-python-headless==4.9.0.80
+albumentations==2.0.8
 
-# Environment Variables
-python-dotenv==1.0.0
-
-# MLOps
-mlflow==2.21.0
-
-# Load pre-trained models
+# --- Pretrained models & NLP utilities ---
 transformers==4.50.3
-
-# Hugging face's library for load local dataset
 datasets==2.19.1
 
-torchvision==0.21.0
+# --- MLOps & experiment tracking ---
+mlflow==2.21.0
+
+# --- Utilities ---
+requests==2.31.0
+python-dotenv==1.0.0
+protobuf==3.20.3
